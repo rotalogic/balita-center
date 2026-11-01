@@ -10,9 +10,10 @@ yang sama persis (file SQL 1 file di folder `database/`).
 
 | Bagian | Isi |
 |---|---|
-| `src/app/(admin)/` | Dashboard, Anak Didik (daftar, tambah 4 bagian + Data Awal, detail), Daily Reports (daftar, buat editor 1-7, Review & Approval), dan halaman modul Akademik, Admission, Keuangan, SDM, Cabang, Laporan, Investor, Komunikasi, Pengaturan |
-| `src/app/(parent)/connect/` | Balita Connect: dashboard orang tua, Pesan, Detail Daily Report (hanya laporan terbit), Perkembangan, Kesehatan, Kegiatan + RSVP |
-| `src/app/api/` | `stats`, `counts`, `meta` (data awal cabang/program/kelas/staf), `children` (GET/POST + detail), `daily-reports` (GET/POST + review), `connect` (data orang tua + RSVP) |
+| `src/app/login/` | Layar login meniru versi Muse (panel visual + kartu login + pemilih 10 peran). Konteks kerja berlabel, bukan autentikasi sungguhan |
+| `src/app/(admin)/` | Dashboard (KPI, grafik laporan 7 hari, jadwal hari ini, aktivitas terbaru, antrean persetujuan), Anak Didik (daftar + ringkasan + filter, wizard tambah 4 langkah + Data Awal, detail 4 tab), Daily Reports (tab status + ekspor CSV, editor dua kolom multi-aktivitas dengan Timeline Hari Ini dan tanda tangan guru, Review & Approval dengan tab, pratinjau, dan checklist syarat terbit), serta halaman modul khusus Akademik, Admission, Keuangan, SDM, Cabang, Laporan, Investor, Komunikasi, Pengaturan yang membaca data tabel aslinya |
+| `src/app/(parent)/connect/` | Balita Connect 9 seksi: dashboard orang tua, Pesan, Detail Daily Report (hanya laporan terbit), Perkembangan, Kesehatan, Kegiatan + RSVP, Galeri, Pembayaran, Pengaturan |
+| `src/app/api/` | `stats`, `counts`, `meta` (data awal cabang/program/kelas/staf), `children` (GET/POST + detail), `daily-reports` (GET/POST + detail + review), `dashboard`, `finance` (tagihan, SPP massal, konfirmasi bayar masuk Buku Kas), `hr` (staf, cuti, keputusan cuti), `modules` (admission/cabang/investor/komunikasi/pengaturan/akademik/laporan), `connect` (data orang tua + RSVP) |
 | `src/lib/db.ts` | Pool PostgreSQL (`pg`) dari `DATABASE_URL` |
 | `database/balita-center-database.sql` | Skema lengkap 66 tabel, 158 FK, seed RBAC 10 peran/23 izin/105 pemetaan, kueri verifikasi |
 | `docker-compose.yml` | Aplikasi + PostgreSQL satu perintah, SQL terpasang otomatis saat database pertama kali dibuat |
@@ -69,21 +70,26 @@ Mode pengembangan: `npm run dev`.
 6. Buka **Balita Connect** dari tautan portal orang tua untuk melihat sisi
    orang tua (laporan terbit, kesehatan, perkembangan, kegiatan + RSVP, pesan).
 
-## Batas paket ini (jujur, sama seperti aplikasi hosted-nya)
+## Batas paket ini (jujur)
 
-- Belum ada login kata sandi/OAuth sungguhan; peran tampil sebagai konteks
-  kerja berlabel. Untuk produksi, tambahkan Auth.js/NextAuth dan kaitkan
+- Layar login meniru tampilan versi Muse tetapi tetap konteks kerja
+  berlabel: kata sandi tidak diperiksa, peran hanya disimpan sebagai label
+  di peramban. Untuk produksi, tambahkan Auth.js/NextAuth dan kaitkan
   `user_roles` + `user_branches`.
 - Balita Connect membaca anak pertama menurut abjad sebagai konteks demo
   orang tua. Produksi wajib memetakan akun orang tua ke anaknya.
 - Belum ada integrasi WhatsApp (Bot Ailsa) dan payment gateway; tabel,
-  antrean, dan alur datanya sudah disiapkan di skema.
+  antrean, dan alur datanya sudah disiapkan di skema, dan halaman Admission
+  membacanya. Pembayaran dicatat + dikonfirmasi staf dan masuk Buku Kas.
 - Unggah foto berkas belum memakai storage S3/R2; dokumentasi laporan
-  dicatat sebagai URL media.
-- Halaman modul non-inti (Akademik, Admission, Keuangan, SDM, Cabang,
-  Laporan, Investor, Komunikasi, Pengaturan) menampilkan hitungan nyata dari
-  tabelnya dan tautan kerja, bukan CRUD penuh per modul. Modul inti yang
-  CRUD penuh: data awal, anak didik, dan laporan harian sampai terbit.
+  dicatat sebagai URL media dan tampil di Galeri orang tua setelah terbit.
+- Alur kerja penuh yang berfungsi: data awal, anak didik, laporan harian
+  sampai terbit, SPP massal + konfirmasi pembayaran, dan keputusan cuti.
+  Halaman modul lain menampilkan data tabel aslinya (daftar, agregat,
+  ringkasan), tetapi formulir tambah/edit per modul itu belum dibuat.
+- Tampilan disamakan semirip mungkin dengan versi Muse dalam struktur,
+  palet, dan susunan layar; bukan salinan piksel-per-piksel, dan versi Muse
+  tetap memuat beberapa layar kerja yang lebih rinci.
 - Row Level Security per cabang/anak belum diaktifkan; kolom pendukungnya
   (`branch_id`, `user_branches`, `user_roles`) sudah ada di skema.
 

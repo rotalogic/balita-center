@@ -28,10 +28,21 @@ function ageLabel(birth: string | null): string {
   return years > 0 ? `${years} tahun ${rest} bulan` : `${rest} bulan`;
 }
 
+const STATUS_FILTERS = ["", "aktif", "cuti", "lulus", "keluar", "alumni"];
+
 export default function AnakPage() {
   const [children, setChildren] = useState<Child[] | null>(null);
+  const [all, setAll] = useState<Child[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+
+  useEffect(() => {
+    fetch("/api/children")
+      .then((r) => r.json())
+      .then((data) => (data.ok ? setAll(data.children) : null))
+      .catch(() => null);
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -43,6 +54,11 @@ export default function AnakPage() {
     return () => clearTimeout(t);
   }, [q]);
 
+  const shown = children ? children.filter((c) => !statusFilter || c.status === statusFilter) : null;
+  const boys = all.filter((c) => c.gender === "laki_laki").length;
+  const girls = all.filter((c) => c.gender === "perempuan").length;
+  const classCount = new Set(all.map((c) => c.class_name).filter(Boolean)).size;
+
   return (
     <>
       <PageHead
@@ -50,26 +66,39 @@ export default function AnakPage() {
         subtitle="Kelola seluruh data anak didik di Balita Center"
         action={<Link className="btn" href="/anak/tambah">+ Tambah Anak</Link>}
       />
+      <section className="grid kpi" aria-label="Ringkasan anak didik">
+        <article className="card kpi-card"><div className="kpi-icon tone-sky" aria-hidden="true">☺</div><div className="kpi-label">Total Anak</div><div className="kpi-value">{all.length}</div></article>
+        <article className="card kpi-card"><div className="kpi-icon tone-sky" aria-hidden="true">♂</div><div className="kpi-label">Laki-laki</div><div className="kpi-value">{boys}</div></article>
+        <article className="card kpi-card"><div className="kpi-icon tone-pink" aria-hidden="true">♀</div><div className="kpi-label">Perempuan</div><div className="kpi-value">{girls}</div></article>
+        <article className="card kpi-card"><div className="kpi-icon tone-sage" aria-hidden="true">▤</div><div className="kpi-label">Kelas Terisi</div><div className="kpi-value">{classCount}</div></article>
+      </section>
       <div className="toolbar card">
         <label className="searchbox">
           <span aria-hidden="true">🔍</span>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari nama anak atau orang tua..." aria-label="Cari anak" />
         </label>
-        {children ? <span className="muted">{children.length} anak tampil</span> : null}
+        <div className="tab-row" role="group" aria-label="Filter status anak">
+          {STATUS_FILTERS.map((s) => (
+            <button key={s || "semua"} type="button" className={statusFilter === s ? "tab-pill active" : "tab-pill"} onClick={() => setStatusFilter(s)} aria-pressed={statusFilter === s}>
+              {s === "" ? "Semua" : s}
+            </button>
+          ))}
+        </div>
+        {shown ? <span className="muted">{shown.length} anak tampil</span> : null}
       </div>
       {error ? <ErrorState message={error} /> : null}
       {!children && !error ? <LoadingState /> : null}
-      {children && children.length === 0 ? (
+      {shown && shown.length === 0 ? (
         <EmptyState title="Belum ada data anak" body="Database masih kosong atau pencarian tidak menemukan hasil. Tambahkan anak pertama lewat tombol Tambah Anak, setelah data awal cabang, program, dan kelas dibuat." />
       ) : null}
-      {children && children.length > 0 ? (
+      {shown && shown.length > 0 ? (
         <div className="card table-wrap">
           <table>
             <thead>
               <tr><th>Foto</th><th>Nama Anak</th><th>Kelas</th><th>Tanggal Lahir</th><th>Usia</th><th>Orang Tua</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
-              {children.map((child, i) => (
+              {shown.map((child, i) => (
                 <tr key={child.id}>
                   <td><span className={`child-photo ${TONES[i % TONES.length]}`}>{child.full_name.charAt(0)}</span></td>
                   <td><strong>{child.full_name}</strong><div className="muted">{child.branch_name}</div></td>

@@ -19,7 +19,7 @@ export async function GET(request: Request) {
       }
       childId = first[0].id;
     }
-    const [child, report, activities, health, development, events, messages] = await Promise.all([
+    const [child, report, activities, health, development, events, messages, photos, invoices] = await Promise.all([
       query("SELECT * FROM children WHERE id = $1", [childId]),
       query(
         `SELECT * FROM daily_reports WHERE child_id = $1 AND status = 'published'
@@ -48,6 +48,18 @@ export async function GET(request: Request) {
           WHERE m.child_id = $1 ORDER BY m.sent_at DESC LIMIT 30`,
         [childId]
       ),
+      query(
+        `SELECT p.id, p.photo_url AS url, p.caption, r.report_date FROM daily_report_photos p
+           JOIN daily_reports r ON r.id = p.report_id
+          WHERE r.child_id = $1 AND r.status = 'published'
+          ORDER BY r.report_date DESC LIMIT 60`,
+        [childId]
+      ),
+      query(
+        `SELECT i.*, (SELECT COALESCE(SUM(pay.amount),0) FROM payments pay WHERE pay.invoice_id = i.id AND pay.status = 'terkonfirmasi') AS paid_total
+           FROM invoices i WHERE i.child_id = $1 ORDER BY i.due_date DESC LIMIT 24`,
+        [childId]
+      ),
     ]);
     return NextResponse.json({
       ok: true,
@@ -58,6 +70,8 @@ export async function GET(request: Request) {
       development,
       events,
       messages,
+      photos,
+      invoices,
     });
   } catch (error) {
     return NextResponse.json({ ok: false, error: dbErrorMessage(error) }, { status: 503 });

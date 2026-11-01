@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 const ADMIN_MENU: Array<[string, string, string]> = [
   ["/", "Dashboard", "⌂"],
@@ -25,6 +25,9 @@ const PARENT_MENU: Array<[string, string, string]> = [
   ["/connect/perkembangan", "Perkembangan", "↗"],
   ["/connect/kesehatan", "Kesehatan", "♥"],
   ["/connect/kegiatan", "Kegiatan", "▦"],
+  ["/connect/galeri", "Galeri", "❀"],
+  ["/connect/pembayaran", "Pembayaran", "▦"],
+  ["/connect/pengaturan", "Pengaturan", "⚙"],
 ];
 
 function Sidebar({ menu, footerNote }: { menu: Array<[string, string, string]>; footerNote: string }) {
@@ -57,6 +60,15 @@ function Sidebar({ menu, footerNote }: { menu: Array<[string, string, string]>; 
 }
 
 function Topbar({ roleLabel }: { roleLabel: string }) {
+  const [storedRole, setStoredRole] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      setStoredRole(window.localStorage.getItem("bc-role"));
+    } catch {
+      setStoredRole(null);
+    }
+  }, []);
+  const label = storedRole || roleLabel;
   return (
     <header className="topbar">
       <label className="searchbox">
@@ -70,9 +82,10 @@ function Topbar({ roleLabel }: { roleLabel: string }) {
           <span className="avatar" aria-hidden="true">W</span>
           <span>
             <strong>Wildan</strong>
-            <small>{roleLabel}</small>
+            <small>{label}</small>
           </span>
         </span>
+        <Link className="btn small secondary" href="/login">Ganti Peran</Link>
       </div>
     </header>
   );

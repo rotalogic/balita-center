@@ -10,6 +10,8 @@ export type ConnectData = {
   development: Array<Record<string, string | null>>;
   events: Array<Record<string, string | null>>;
   messages: Array<Record<string, string | null>>;
+  photos: Array<Record<string, string | null>>;
+  invoices: Array<Record<string, string | number | null>>;
 };
 
 // Mengambil data Balita Connect satu anak dari /api/connect.
