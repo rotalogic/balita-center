@@ -1,0 +1,31 @@
+# Balita Center: aplikasi + PostgreSQL dalam satu VPS.
+# GANTI kata sandi di bawah sebelum dipakai produksi, dan samakan dengan DATABASE_URL.
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: balita
+      POSTGRES_PASSWORD: ganti-kata-sandi-ini
+      POSTGRES_DB: balita_center
+    volumes:
+      - balita_pgdata:/var/lib/postgresql/data
+      # File SQL dijalankan otomatis HANYA saat volume data masih kosong (pertama kali).
+      - ./database/balita-center-database.sql:/docker-entrypoint-initdb.d/01-balita.sql:ro
+    ports:
+      - "54329:5432"
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgres://balita:ganti-kata-sandi-ini@db:5432/balita_center
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    ports:
+      - "3000:3000"
+
+volumes:
+  balita_pgdata:
