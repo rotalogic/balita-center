@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { emailRaporTerbitWali } from "@/lib/beritahu-wali";
 import { dbErrorMessage, query } from "@/lib/db";
 import { guard, hasPermission } from "@/lib/current-user";
 import { catatAudit } from "@/lib/audit";
@@ -75,6 +76,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       await catatAudit(denied.user, {
         action: "rapor.diterbitkan", entityTable: "cycle_reports", entityId: params.id, branchId: branch_id, detail: {},
       });
+      void emailRaporTerbitWali(params.id).catch((e) => console.error("[EMAIL-TERBIT]", (e as Error)?.message));
       return NextResponse.json({ ok: true, status: "published" });
     }
 

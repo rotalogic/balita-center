@@ -111,7 +111,22 @@ Cara kerja pengiriman tagihan per tagihan baru:
 Setiap pengiriman tercatat di tabel `invoice_notifications`
 (channel: dalam_aplikasi / email / whatsapp).
 
-## 7. Payment gateway Midtrans (opsional, bisa menyusul)
+## 7. Backup database otomatis
+
+- Skrip `deploy/backup-db.sh` membuat dump PostgreSQL (format custom) ke
+  `/var/backups/balita-center/` dan mempertahankan 14 berkas terbaru.
+  DATABASE_URL dibaca dari `/etc/balita-center/job.env` yang sama dengan
+  job tagihan. Cron-nya ada di langkah 6.
+- Uji jalan sekali secara manual setelah deploy:
+  `/opt/balita-center/deploy/backup-db.sh` lalu periksa berkasnya dengan
+  `pg_restore --list <berkas.dump> | head`.
+- Memulihkan (latih dulu di database kosong terpisah, jangan langsung
+  ke produksi): `pg_restore --clean --if-exists -d "$DATABASE_URL" <berkas.dump>`.
+- Folder backup berada di server yang sama; untuk ketahanan penuh,
+  salin berkala ke luar server (mis. rclone ke penyimpanan objek) —
+  di luar cakupan panduan ini.
+
+## 8. Payment gateway Midtrans (opsional, bisa menyusul)
 
 1. Di dashboard Midtrans sekolah: ambil Server Key & Client Key
    (Settings → Access Keys), dan atur **Payment Notification URL** ke
@@ -125,7 +140,7 @@ Setiap pengiriman tercatat di tabel `invoice_notifications`
 4. Pindah ke mode **Produksi** hanya sesudah alur sandbox terverifikasi
    dengan satu pembayaran uji sungguhan di sandbox.
 
-## 8. Sesudah deploy — tiga hal di dalam aplikasi
+## 9. Sesudah deploy — tiga hal di dalam aplikasi
 
 1. **Tempel kunci DeepSeek asli**: halaman Ailsa → kartu "Kunci LLM —
    DeepSeek" → tempel kunci, pilih/ muat model, Simpan, lalu Uji
@@ -136,7 +151,7 @@ Setiap pengiriman tercatat di tabel `invoice_notifications`
    manual kini memakai izin `finance.manage`) atau lewat skrip di
    langkah 6, lalu periksa `invoice_notifications` untuk periode uji.
 
-## 9. Catatan perbaikan yang ikut dalam rilis ini
+## 10. Catatan perbaikan yang ikut dalam rilis ini
 
 - Middleware kini mengecualikan `/api/jobs/*` bila membawa header
   `x-job-token` (token tetap divalidasi di route). Sebelumnya cron
@@ -145,7 +160,7 @@ Setiap pengiriman tercatat di tabel `invoice_notifications`
 - Izin jalur manual job diperbaiki dari `finance.update` (tidak ada di
   sistem izin) menjadi `finance.manage`.
 
-## 10. File workflow GitHub (terpisah dari deploy)
+## 11. File workflow GitHub (terpisah dari deploy)
 
 `.github/workflows/build.yml` (isi sama dengan `build-check-workflow.yml`
 di akar repo bila masih ada) perlu ditambahkan lewat web GitHub atau git

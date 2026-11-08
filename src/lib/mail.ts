@@ -109,3 +109,21 @@ export function emailUndangan(to: string, nama: string, url: string, peran: stri
     html: `<p>Halo ${nama},</p><p>Anda diundang ke <strong>Balita Center</strong> sebagai <strong>${peran}</strong>.</p><p>Buka tautan ini untuk membuat kata sandi (berlaku 3 hari):</p><p><a href="${url}">${url}</a></p>`,
   });
 }
+
+export function emailLaporanTerbit(to: string, d: { wali: string; anak: string; tanggal: string; tautan: string }) {
+  return kirimEmail({
+    to,
+    subject: `Laporan harian ${d.anak} — ${d.tanggal} sudah terbit`,
+    text: `Halo ${d.wali},\n\nLaporan harian untuk ${d.anak} (${d.tanggal}) sudah diterbitkan guru dan dapat dibaca di Balita Connect:\n${d.tautan}\n\nDi dalamnya ada kegiatan dan pembelajaran hari ini, makan, tidur, serta catatan guru.\n\n— Balita Center`,
+    html: `<p>Halo ${d.wali},</p><p>Laporan harian untuk <strong>${d.anak}</strong> (${d.tanggal}) sudah diterbitkan guru.</p><p><a href="${d.tautan}">Buka laporan di Balita Connect</a></p><p>Di dalamnya ada kegiatan dan pembelajaran hari ini, makan, tidur, serta catatan guru.</p><p>— Balita Center</p>`,
+  });
+}
+
+export function emailRaporTerbit(to: string, d: { wali: string; anak: string; siklus: string; tautan: string }) {
+  return kirimEmail({
+    to,
+    subject: `Rapor perkembangan ${d.anak} — ${d.siklus} sudah terbit`,
+    text: `Halo ${d.wali},\n\nRapor perkembangan untuk ${d.anak} (${d.siklus}) sudah diterbitkan dan dapat dibaca di Balita Connect:\n${d.tautan}\n\nRapor berisi narasi perkembangan per aspek, capaian Montessori, ringkasan kehadiran dan tumbuh kembang, serta saran untuk di rumah.\n\n— Balita Center`,
+    html: `<p>Halo ${d.wali},</p><p>Rapor perkembangan untuk <strong>${d.anak}</strong> (${d.siklus}) sudah diterbitkan.</p><p><a href="${d.tautan}">Buka rapor di Balita Connect</a></p><p>Rapor berisi narasi perkembangan per aspek, capaian Montessori, ringkasan kehadiran dan tumbuh kembang, serta saran untuk di rumah.</p><p>— Balita Center</p>`,
+  });
+}

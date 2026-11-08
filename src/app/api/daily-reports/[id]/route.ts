@@ -4,6 +4,7 @@ import { guard, hasPermission } from "@/lib/current-user";
 import { cekSyaratTerbit } from "@/lib/syarat-terbit";
 import { beda, catatAudit } from "@/lib/audit";
 import { notifLaporanTerbit } from "@/lib/ailsa/notify";
+import { emailLaporanTerbitWali } from "@/lib/beritahu-wali";
 
 export const dynamic = "force-dynamic";
 
@@ -164,6 +165,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         [params.id]
       );
       void notifLaporanTerbit(params.id).catch((e) => console.error("[NOTIF]", (e as Error)?.message));
+      void emailLaporanTerbitWali(params.id).catch((e) => console.error("[EMAIL-TERBIT]", (e as Error)?.message));
       await catatAudit(denied.user, {
         action: "daily_report.publish",
         entityTable: "daily_reports",
