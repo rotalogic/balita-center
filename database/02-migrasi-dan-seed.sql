@@ -510,3 +510,47 @@ ON CONFLICT DO NOTHING;
 
 SELECT (SELECT count(*) FROM materials) AS material, (SELECT count(*) FROM milestones) AS milestone,
        (SELECT count(*) FROM material_milestones) AS pemetaan;
+
+-- ===== database/migrasi-rapor.sql =====
+-- Rapor periodik: lengkapi struktur sesuai referensi portal lama.
+-- cycle_reports sebelumnya hanya punya 5 kolom narasi STPPA; rapor referensi
+-- memuat 6 aspek STPPA (termasuk Seni), 5 narasi Area Montessori, Kesimpulan,
+-- dan Saran untuk Orang Tua. health_checks mendapat kolom status gizi supaya
+-- Ringkasan Tumbuh Kembang rapor bisa menampilkannya (label manusiawi di UI,
+-- bukan kode mentah). Aman dijalankan berulang.
+
+ALTER TABLE cycle_reports
+  ADD COLUMN IF NOT EXISTS narrative_seni TEXT,
+  ADD COLUMN IF NOT EXISTS narrative_practical_life TEXT,
+  ADD COLUMN IF NOT EXISTS narrative_language TEXT,
+  ADD COLUMN IF NOT EXISTS narrative_sensorial TEXT,
+  ADD COLUMN IF NOT EXISTS narrative_mathematics TEXT,
+  ADD COLUMN IF NOT EXISTS narrative_cultural TEXT,
+  ADD COLUMN IF NOT EXISTS conclusion TEXT,
+  ADD COLUMN IF NOT EXISTS parent_suggestion TEXT;
+
+ALTER TABLE health_checks
+  ADD COLUMN IF NOT EXISTS nutrition_status VARCHAR(24)
+    CHECK (nutrition_status IN ('gizi_baik', 'gizi_kurang', 'gizi_lebih', 'obesitas', 'stunting'));
+
+-- ===== database/migrasi-media.sql =====
+-- Media laporan: video di galeri laporan harian + foto langsung di rapor.
+-- daily_report_photos sudah punya media_type/mime_type sejak awal; yang kurang
+-- hanya poster_url (gambar sampul video untuk PDF dan daftar). Rapor mendapat
+-- tabel foto sendiri supaya guru bisa melengkapi Dokumentasi Kegiatan di luar
+-- tarikan otomatis dari laporan harian. Aman dijalankan berulang.
+
+ALTER TABLE daily_report_photos
+  ADD COLUMN IF NOT EXISTS poster_url TEXT;
+
+CREATE TABLE IF NOT EXISTS cycle_report_photos (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  report_id  UUID NOT NULL REFERENCES cycle_reports(id) ON DELETE CASCADE,
+  photo_url  TEXT NOT NULL,
+  caption    TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_cycle_report_photos_report
+  ON cycle_report_photos (report_id, sort_order, created_at);

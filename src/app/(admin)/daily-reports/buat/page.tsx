@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ErrorState, PageHead } from "@/components/chrome";
 import { TimeInput } from "@/components/time-input";
-import { useUpload } from "@/components/upload";
+import { buatPosterVideo, useUpload } from "@/components/upload";
 import { SyaratChecklist, cekSyaratLokal } from "@/components/syarat-checklist";
 
 type Meta = {
@@ -15,6 +15,7 @@ type Meta = {
   staff: Array<{ id: string; branch_id: string; full_name: string; position: string }>;
 };
 type Child = { id: string; full_name: string; branch_name: string };
+type GaleriItem = { url: string; media_type: "image" | "video"; mime_type?: string; poster_url?: string };
 type Activity = { title: string; apparatus: string; area: string; rating: string; photo_url: string; activity_time: string; notes: string; work_location: string; work_mode: string };
 const emptyActivity: Activity = { title: "", apparatus: "", area: "", rating: "4", photo_url: "", activity_time: "", notes: "", work_location: "", work_mode: "" };
 const AREA_OPSI = [["practical_life", "Practical Life"], ["language", "Language"], ["sensorial", "Sensorial"], ["mathematics", "Mathematics"], ["cultural", "Cultural"], ["observasi", "Observasi"]];
@@ -30,7 +31,8 @@ export default function BuatDailyReportPage() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string>>({ report_date: new Date().toISOString().slice(0, 10), meal_level: "banyak", snack_level: "banyak", nap_quality: "baik", mood: "ceria" });
   const [activities, setActivities] = useState<Activity[]>([{ ...emptyActivity }]);
-  const [photoUrls, setPhotoUrls] = useState<string[]>([""]);
+  const [gallery, setGallery] = useState<GaleriItem[]>([]);
+  const photoUrls = gallery.map((g) => g.url);
   const [result, setResult] = useState<{ ok: boolean; message: string; existingId?: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -115,8 +117,13 @@ export default function BuatDailyReportPage() {
               }))
             : [{ ...emptyActivity }]
         );
-        const gallery = ((d.photos || []) as Array<Record<string, unknown>>).map((p) => String(p.photo_url ?? ""));
-        setPhotoUrls(gallery.length > 0 ? gallery : [""]);
+        const galeri = ((d.photos || []) as Array<Record<string, unknown>>).map((p) => ({
+          url: String(p.photo_url ?? ""),
+          media_type: (p.media_type === "video" ? "video" : "image") as "image" | "video",
+          mime_type: p.mime_type ? String(p.mime_type) : undefined,
+          poster_url: p.poster_url ? String(p.poster_url) : undefined,
+        })).filter((g) => g.url);
+        setGallery(galeri);
       })
       .catch(() => setError("Laporan tidak bisa dimuat."));
 
@@ -128,14 +135,14 @@ export default function BuatDailyReportPage() {
     if (!siap) return;
     const timer = setTimeout(() => {
       try {
-        localStorage.setItem(kunciDraf, JSON.stringify({ form, activities, photoUrls }));
+        localStorage.setItem(kunciDraf, JSON.stringify({ form, activities, gallery }));
         setSimpanTerakhir(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }));
       } catch {
         /* kuota penuh: abaikan, jangan ganggu pengisian */
       }
     }, 700);
     return () => clearTimeout(timer);
-  }, [form, activities, photoUrls, siap, kunciDraf]);
+  }, [form, activities, gallery, siap, kunciDraf]);
 
   // Pulihkan simpanan lokal setelah data server selesai dimuat.
   useEffect(() => {
@@ -143,10 +150,11 @@ export default function BuatDailyReportPage() {
     try {
       const simpan = localStorage.getItem(kunciDraf);
       if (!simpan) return;
-      const isi = JSON.parse(simpan) as { form?: Record<string, string>; activities?: typeof activities; photoUrls?: string[] };
+      const isi = JSON.parse(simpan) as { form?: Record<string, string>; activities?: typeof activities; gallery?: GaleriItem[]; photoUrls?: string[] };
       if (isi.form) setForm((p) => ({ ...p, ...isi.form }));
       if (isi.activities?.length) setActivities(isi.activities);
-      if (isi.photoUrls?.length) setPhotoUrls(isi.photoUrls);
+      if (isi.gallery?.length) setGallery(isi.gallery);
+      else if (isi.photoUrls?.length) setGallery(isi.photoUrls.filter(Boolean).map((url) => ({ url, media_type: "image" as const })));
       setDipulihkan(true);
     } catch {
       /* simpanan rusak: abaikan */
@@ -171,16 +179,28 @@ export default function BuatDailyReportPage() {
   async function unggahFoto(files: FileList | null, target: { kind: "galeri" } | { kind: "aktivitas"; index: number }) {
     if (!files || files.length === 0) return;
     for (const file of Array.from(files)) {
-      const url = await upload.unggah(file);
-      if (!url) return;
-      if (target.kind === "galeri") {
-        setPhotoUrls((prev) => {
-          const isi = prev.filter(Boolean);
-          return [...isi, url];
-        });
-      } else {
-        setActivity(target.index, { photo_url: url });
+      const video = file.type.startsWith("video/");
+      if (video && target.kind === "aktivitas") {
+        upload.setError("Foto aktivitas hanya gambar. Video masuk lewat galeri Foto & Video di bawah.");
+        return;
       }
+      const hasil = await upload.unggah(file);
+      if (!hasil) return;
+      if (target.kind === "aktivitas") {
+        setActivity(target.index, { photo_url: hasil.url });
+        continue;
+      }
+      let posterUrl: string | undefined;
+      if (video) {
+        // Poster diambil dari frame awal di peramban; kegagalan poster tidak
+        // menggagalkan videonya — PDF akan memakai kotak penanda video.
+        const poster = await buatPosterVideo(file);
+        if (poster) {
+          const naik = await upload.unggah(poster);
+          if (naik) posterUrl = naik.url;
+        }
+      }
+      setGallery((prev) => [...prev, { url: hasil.url, media_type: hasil.media_type, mime_type: hasil.mime_type, poster_url: posterUrl }]);
     }
   }
 
@@ -198,7 +218,7 @@ export default function BuatDailyReportPage() {
       submit: submitForReview,
       circle_rating: Number(form.circle_rating || 0),
       activities: activities.filter((a) => a.title).map((a) => ({ ...a, rating: Number(a.rating || 0) })),
-      photo_urls: photoUrls.filter(Boolean),
+      photos: gallery.map((g) => ({ photo_url: g.url, media_type: g.media_type, mime_type: g.mime_type, poster_url: g.poster_url })),
     };
     try {
       const res = reportId
@@ -374,20 +394,25 @@ export default function BuatDailyReportPage() {
 
             <h2 style={{ marginTop: 22 }}>8. Foto &amp; Video</h2>
             <div className="field">
-              <label htmlFor="foto-galeri">Unggah foto (JPG/PNG/WEBP, maks 5 MB)</label>
-              <input id="foto-galeri" type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={upload.uploading} onChange={(e) => void unggahFoto(e.target.files, { kind: "galeri" })} />
+              <label htmlFor="foto-galeri">Unggah foto atau video (JPG/PNG/WEBP maks 5 MB · MP4/WebM maks 50 MB)</label>
+              <input id="foto-galeri" type="file" multiple accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" disabled={upload.uploading} onChange={(e) => void unggahFoto(e.target.files, { kind: "galeri" })} />
               {upload.uploading ? <span className="muted" style={{ fontSize: 12 }}>Mengunggah…</span> : null}
+              {upload.error ? <p className="error" role="alert" style={{ fontSize: 13 }}>{upload.error}</p> : null}
             </div>
-            {photoUrls.filter(Boolean).length === 0 ? (
-              <p className="muted">Belum ada foto.</p>
+            {gallery.length === 0 ? (
+              <p className="muted">Belum ada foto atau video.</p>
             ) : (
               <ul style={{ listStyle: "none", padding: 0, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {photoUrls.filter(Boolean).map((url, i) => (
-                  <li key={url} style={{ border: "1px solid #e3e7ee", borderRadius: 8, padding: 6 }}>
-                    <a href={url} target="_blank" rel="noreferrer">
-                      <img src={url} alt={`Foto ${i + 1}`} width={96} height={96} style={{ objectFit: "cover", borderRadius: 4, display: "block" }} />
-                    </a>
-                    <button type="button" className="btn small danger" style={{ marginTop: 6, width: "100%" }} onClick={() => setPhotoUrls((prev) => prev.filter((u) => u !== url))}>
+                {gallery.map((g, i) => (
+                  <li key={`${g.url}-${i}`} style={{ border: "1px solid #e3e7ee", borderRadius: 8, padding: 6 }}>
+                    {g.media_type === "video" ? (
+                      <video src={g.url} poster={g.poster_url} controls preload="metadata" width={144} height={96} style={{ objectFit: "cover", borderRadius: 4, display: "block", background: "#000" }} />
+                    ) : (
+                      <a href={g.url} target="_blank" rel="noreferrer">
+                        <img src={g.url} alt={`Foto ${i + 1}`} width={96} height={96} style={{ objectFit: "cover", borderRadius: 4, display: "block" }} />
+                      </a>
+                    )}
+                    <button type="button" className="btn small danger" style={{ marginTop: 6, width: "100%" }} onClick={() => setGallery((prev) => prev.filter((_, idx) => idx !== i))}>
                       Hapus
                     </button>
                   </li>

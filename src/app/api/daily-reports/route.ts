@@ -88,6 +88,7 @@ export async function POST(request: Request) {
       submit?: boolean;
       activities?: ActivityInput[];
       photo_urls?: string[];
+      photos?: Array<{ photo_url: string; media_type?: string; mime_type?: string; poster_url?: string; caption?: string }>;
     };
 
     const duplikat = await query<{ id: string; child_name: string }>(
@@ -172,9 +173,19 @@ export async function POST(request: Request) {
         ]
       );
     }
-    for (const url of body.photo_urls || []) {
-      if (!url) continue;
-      await query("INSERT INTO daily_report_photos (report_id, photo_url) VALUES ($1,$2)", [reportId, url]);
+    if (Array.isArray(body.photos)) {
+      for (const p of body.photos) {
+        if (!p.photo_url) continue;
+        await query(
+          "INSERT INTO daily_report_photos (report_id, photo_url, media_type, mime_type, poster_url, caption) VALUES ($1,$2,$3,$4,$5,$6)",
+          [reportId, p.photo_url, p.media_type === "video" ? "video" : "image", p.mime_type || null, p.poster_url || null, p.caption || null]
+        );
+      }
+    } else {
+      for (const url of body.photo_urls || []) {
+        if (!url) continue;
+        await query("INSERT INTO daily_report_photos (report_id, photo_url) VALUES ($1,$2)", [reportId, url]);
+      }
     }
 
     // Laporan baru selalu dibuat sebagai draft dulu, lalu — bila diminta —

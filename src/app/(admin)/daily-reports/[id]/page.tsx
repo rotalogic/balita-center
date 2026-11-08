@@ -47,7 +47,7 @@ type Activity = {
   work_mode: string | null;
 };
 
-type Photo = { id: string; photo_url: string };
+type Photo = { id: string; photo_url: string; media_type?: string; poster_url?: string | null; caption?: string | null };
 
 const tanggal = (iso: string) =>
   new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" }).format(
@@ -174,13 +174,17 @@ export default function DailyReportDetailPage({ params }: { params: { id: string
 
       {photos.length > 0 ? (
         <div className="card" style={{ marginTop: 16 }}>
-          <h2>Foto Galeri ({photos.length})</h2>
+          <h2>Foto &amp; Video Galeri ({photos.length})</h2>
           <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
-            {photos.map((photo) => (
-              <a key={photo.id} href={photo.photo_url} target="_blank" rel="noreferrer">
-                <img src={photo.photo_url} alt="Foto galeri laporan" width={110} height={110} style={{ objectFit: "cover", borderRadius: 8, display: "block" }} />
-              </a>
-            ))}
+            {photos.map((photo) =>
+              photo.media_type === "video" ? (
+                <video key={photo.id} src={photo.photo_url} poster={photo.poster_url || undefined} controls preload="metadata" width={196} height={110} style={{ objectFit: "cover", borderRadius: 8, display: "block", background: "#000" }} />
+              ) : (
+                <a key={photo.id} href={photo.photo_url} target="_blank" rel="noreferrer">
+                  <img src={photo.photo_url} alt="Foto galeri laporan" width={110} height={110} style={{ objectFit: "cover", borderRadius: 8, display: "block" }} />
+                </a>
+              )
+            )}
           </div>
         </div>
       ) : null}

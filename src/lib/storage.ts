@@ -13,9 +13,14 @@ export const EXT: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
+  "video/mp4": "mp4",
+  "video/webm": "webm",
 };
 
 export const MAX_BYTES = 5 * 1024 * 1024;
+export const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
+
+export const jenisMedia = (mime: string): "video" | "image" => (mime.startsWith("video/") ? "video" : "image");
 const DIR = process.env.UPLOAD_DIR || "/app/uploads";
 
 export function storageMode(): StorageMode {
@@ -73,4 +78,6 @@ export const MIME: Record<string, string> = {
   jpg: "image/jpeg",
   png: "image/png",
   webp: "image/webp",
+  mp4: "video/mp4",
+  webm: "video/webm",
 };

@@ -92,7 +92,7 @@ export async function GET(request: Request) {
         [childId]
       ),
       query(
-        `SELECT p.id, p.photo_url AS url, p.caption, r.report_date FROM daily_report_photos p
+        `SELECT p.id, p.photo_url AS url, p.caption, p.media_type, p.poster_url, r.report_date FROM daily_report_photos p
            JOIN daily_reports r ON r.id = p.report_id
           WHERE r.child_id = $1 AND r.status = 'published'
           ORDER BY r.report_date DESC LIMIT 60`,

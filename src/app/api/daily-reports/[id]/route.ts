@@ -47,6 +47,7 @@ type PatchBody = {
   restore?: boolean;
   activities?: ActivityInput[];
   photo_urls?: string[];
+  photos?: Array<{ photo_url: string; media_type?: string; mime_type?: string; poster_url?: string; caption?: string }>;
 };
 
 const EDITABLE = ["draft", "revisi"];
@@ -251,7 +252,16 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       }
     }
 
-    if (Array.isArray(body.photo_urls)) {
+    if (Array.isArray(body.photos)) {
+      await query("DELETE FROM daily_report_photos WHERE report_id = $1", [params.id]);
+      for (const p of body.photos) {
+        if (!p.photo_url) continue;
+        await query(
+          "INSERT INTO daily_report_photos (report_id, photo_url, media_type, mime_type, poster_url, caption) VALUES ($1,$2,$3,$4,$5,$6)",
+          [params.id, p.photo_url, p.media_type === "video" ? "video" : "image", p.mime_type || null, p.poster_url || null, p.caption || null]
+        );
+      }
+    } else if (Array.isArray(body.photo_urls)) {
       await query("DELETE FROM daily_report_photos WHERE report_id = $1", [params.id]);
       for (const url of body.photo_urls) {
         if (!url) continue;

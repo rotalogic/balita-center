@@ -9,10 +9,18 @@ export const dynamic = "force-dynamic";
 
 const ASPEK: Array<[string, string]> = [
   ["narrative_agama_moral", "Nilai Agama dan Moral"],
-  ["narrative_fisik_motorik", "Fisik Motorik"],
+  ["narrative_fisik_motorik", "Fisik-Motorik"],
   ["narrative_kognitif", "Kognitif"],
   ["narrative_bahasa", "Bahasa"],
-  ["narrative_sosial_emosional", "Sosial Emosional"],
+  ["narrative_sosial_emosional", "Sosial-Emosional dan Kemandirian"],
+  ["narrative_seni", "Seni"],
+  ["narrative_practical_life", "Montessori — Practical Life"],
+  ["narrative_language", "Montessori — Language"],
+  ["narrative_sensorial", "Montessori — Sensorial"],
+  ["narrative_mathematics", "Montessori — Mathematics"],
+  ["narrative_cultural", "Montessori — Cultural"],
+  ["conclusion", "Kesimpulan"],
+  ["parent_suggestion", "Saran untuk Orang Tua"],
 ];
 
 // Rapor perkembangan per siklus — dokumen GURU. Analisa Ailsa tidak pernah masuk sini.
@@ -24,11 +32,13 @@ export default async function CetakRapor({ params }: { params: { id: string } })
     `SELECT cr.id, cr.status, cr.child_id, c.full_name AS child_name, b.name AS branch_name,
             (SELECT cl.name FROM enrollments e JOIN classes cl ON cl.id = e.class_id
               WHERE e.child_id = c.id AND e.status='aktif' ORDER BY e.start_date DESC NULLS LAST LIMIT 1) AS class_name,
-            lc.name AS cycle_name, lc.start_date, lc.end_date,
+            lc.theme AS cycle_name, lc.start_date, lc.end_date,
             s.full_name AS guru,
             to_char(cr.published_at AT TIME ZONE 'Asia/Jakarta','YYYY-MM-DD') AS published_on,
             cr.narrative_agama_moral, cr.narrative_fisik_motorik, cr.narrative_kognitif,
-            cr.narrative_bahasa, cr.narrative_sosial_emosional
+            cr.narrative_bahasa, cr.narrative_sosial_emosional, cr.narrative_seni,
+            cr.narrative_practical_life, cr.narrative_language, cr.narrative_sensorial,
+            cr.narrative_mathematics, cr.narrative_cultural, cr.conclusion, cr.parent_suggestion
        FROM cycle_reports cr
        JOIN children c ON c.id = cr.child_id
        JOIN branches b ON b.id = cr.branch_id
