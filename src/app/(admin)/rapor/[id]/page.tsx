@@ -76,7 +76,7 @@ export default function RaporViewPage({ params }: { params: { id: string } }) {
         <RaporWeb
           report={report}
           agregat={agregat}
-          pdfUrl={terbit ? `/api/dokumen/rapor/${params.id}/pdf` : null}
+          pdfUrl={terbit ? `/api/dokumen/rapor/${params.id}/pdf` : `/api/dokumen/rapor/${params.id}/pdf?pratinjau=1`}
         />
       </div>
     </>

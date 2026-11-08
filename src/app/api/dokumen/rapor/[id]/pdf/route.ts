@@ -28,7 +28,13 @@ export async function GET(request: Request, { params }: { params: { id: string }
   );
   const r = rows[0];
   if (!r) return new Response("Rapor tidak ditemukan.", { status: 404 });
-  if (r.status !== "published") return new Response("Rapor belum diterbitkan.", { status: 404 });
+  // Pratinjau draf: khusus staf (reports.view), dokumen diberi penanda DRAF.
+  const pratinjau = new URL(request.url).searchParams.get("pratinjau") === "1";
+  if (r.status !== "published") {
+    if (!(pratinjau && (hasPermission(user, "reports.view") || user.roles.includes("super_admin")))) {
+      return new Response("Rapor belum diterbitkan.", { status: 404 });
+    }
+  }
 
   let boleh = hasPermission(user, "reports.view") || user.roles.includes("super_admin");
   if (!boleh) {
@@ -41,13 +47,13 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
   if (!boleh) return new Response("Anda tidak berhak mengunduh rapor ini.", { status: 403 });
 
-  const pdf = await bangunPdfRapor(r, params.id, new URL(request.url).origin, request.headers.get("cookie") || "");
+  const pdf = await bangunPdfRapor(r, params.id, new URL(request.url).origin, request.headers.get("cookie") || "", pratinjau && r.status !== "published");
 
   const nama = String(r.child_name).replace(/[^\w\-]+/g, "-");
   return new Response(pdf, {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="Rapor-${nama}.pdf"`,
+      "Content-Disposition": `attachment; filename="${pratinjau && r.status !== "published" ? "Pratinjau-Draf-" : ""}Rapor-${nama}.pdf"`,
       "Content-Length": String(pdf.length),
     },
   });

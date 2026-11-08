@@ -6,6 +6,8 @@
 // supaya bentuk yang dilihat guru sama persis dengan yang diterima orang tua.
 // PDF (src/lib/pdf/laporan.ts) mengikuti susunan dan warna yang sama.
 
+import { MerekSekolah } from "./merek-sekolah";
+
 export type LaporanAktivitas = {
   id?: string;
   title: string;
@@ -228,6 +230,7 @@ export function LaporanWeb({
 
   return (
     <div className="lap">
+      <MerekSekolah />
       <GayaLaporan />
       <header className="lap-kepala">
         <span className="lap-kal"><Ikon d={JALUR.kalender} size={22} warna="#1d7fa8" /></span>

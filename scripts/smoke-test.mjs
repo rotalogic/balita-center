@@ -69,6 +69,9 @@ async function main() {
   const akad = await minta("/api/academic");
   catat("Akademik termuat (termasuk kegiatan)", akad.status === 200 && Array.isArray(akad.json?.events), `HTTP ${akad.status}`);
 
+  const ilus = await fetch(`${BASE}/ilustrasi/sampul-laporan.jpg`, { headers: kuki ? { Cookie: kuki } : {} }).catch(() => null);
+  catat("Aset ilustrasi tersaji (kemasan standalone benar)", Boolean(ilus && ilus.status === 200), ilus ? `HTTP ${ilus.status}` : "tidak terjangkau");
+
   // 7. Setelan gateway terbaca & tidak membocorkan kunci
   const gw = await minta("/api/keuangan/gateway");
   const gwTeks = JSON.stringify(gw.json || {});

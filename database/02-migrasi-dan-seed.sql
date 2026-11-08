@@ -598,3 +598,15 @@ INSERT INTO school_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
 -- halaman Akun; tanda tangan tampil di kaki laporan harian & rapor).
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS photo_url text;
 ALTER TABLE staff ADD COLUMN IF NOT EXISTS signature_url text;
+-- Migrasi: penanda transaksi gateway pada pembayaran, untuk pembayaran
+-- sebagian (cicilan) via Midtrans dan idempotensi webhook.
+-- Satu order_id Midtrans hanya boleh tercatat satu kali.
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS gateway_order_id text;
+CREATE UNIQUE INDEX IF NOT EXISTS payments_gateway_order_unik
+  ON payments (gateway_order_id) WHERE gateway_order_id IS NOT NULL;
+-- Migrasi: perlebar kolom status tagihan.
+-- Nilai sah 'menunggu_konfirmasi' panjangnya 19 karakter, sedangkan kolom
+-- invoices.status hanya varchar(16) — akibatnya setiap pembayaran sebagian
+-- (manual maupun gateway) gagal saat status diperbarui, padahal pembayaran
+-- sudah tercatat. varchar(24) memberi ruang aman.
+ALTER TABLE invoices ALTER COLUMN status TYPE varchar(24);

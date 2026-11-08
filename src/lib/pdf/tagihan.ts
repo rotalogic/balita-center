@@ -8,6 +8,7 @@ export type DataTagihan = {
   sekolah_tagline?: string;
   sekolah_alamat?: string | null;
   sekolah_telepon?: string | null;
+  logo?: Buffer | null; // logo sekolah dari identitas
   invoice_number: string | null;
   status: string;
   description: string | null;
@@ -51,9 +52,16 @@ export function buatPdfTagihan(d: DataTagihan): PDFKit.PDFDocument {
   let y = 44;
 
   // Kepala: merek kiri, judul kanan, palang emas di bawahnya.
-  doc.fillColor(MARUN).font("Helvetica-Bold").fontSize(17).text((d.sekolah_nama || "Balita Center").toUpperCase(), kiri, y);
+  let geserLogo = 0;
+  if (d.logo) {
+    try {
+      doc.image(d.logo, kiri, y - 2, { fit: [92, 32] });
+      geserLogo = 102;
+    } catch { /* logo gagal dimuat — kop teks tetap tampil */ }
+  }
+  doc.fillColor(MARUN).font("Helvetica-Bold").fontSize(17).text((d.sekolah_nama || "Balita Center").toUpperCase(), kiri + geserLogo, y);
   doc.fillColor(ABU).font("Helvetica").fontSize(9)
-    .text(`${d.sekolah_tagline || "Montessori & Childcare"} — Cabang ${d.branch_name}${d.branch_city ? ` (${d.branch_city})` : ""}${d.sekolah_alamat ? ` · ${d.sekolah_alamat}` : ""}${d.sekolah_telepon ? ` · ${d.sekolah_telepon}` : ""}`, kiri, y + 21, { width: 330 });
+    .text(`${d.sekolah_tagline || "Montessori & Childcare"} — Cabang ${d.branch_name}${d.branch_city ? ` (${d.branch_city})` : ""}${d.sekolah_alamat ? ` · ${d.sekolah_alamat}` : ""}${d.sekolah_telepon ? ` · ${d.sekolah_telepon}` : ""}`, kiri + geserLogo, y + 21, { width: 330 - geserLogo });
   doc.fillColor(TINTA).font("Helvetica-Bold").fontSize(15)
     .text("TAGIHAN SPP", kiri, y, { width: lebar, align: "right" });
   doc.fillColor(ABU).font("Helvetica").fontSize(9)
@@ -152,6 +160,17 @@ export async function pdfTagihanBuffer(invoiceId: string): Promise<{ buffer: Buf
   data.sekolah_tagline = identitas.tagline;
   data.sekolah_alamat = identitas.alamat;
   data.sekolah_telepon = identitas.telepon;
+  if (identitas.logo_url) {
+    try {
+      if (identitas.logo_url.startsWith("/api/files/")) {
+        const { baca } = await import("../storage");
+        data.logo = await baca(identitas.logo_url.split("/").pop() || "");
+      } else {
+        const respon = await fetch(identitas.logo_url);
+        if (respon.ok) data.logo = Buffer.from(await respon.arrayBuffer());
+      }
+    } catch { data.logo = null; }
+  }
   const doc = buatPdfTagihan(data);
   const chunks: Buffer[] = [];
   const selesai = new Promise<Buffer>((resolve) => {

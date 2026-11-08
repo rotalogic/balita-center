@@ -6,6 +6,7 @@
 // Semua label di sini manusiawi — kode mentah database tidak tampil.
 
 import { NARASI_MONTESSORI, NARASI_STPPA, labelGizi, type AgregatRapor } from "@/lib/rapor-data";
+import { MerekSekolah } from "./merek-sekolah";
 
 export type RaporData = Record<string, string | number | null | undefined>;
 
@@ -81,6 +82,7 @@ export function RaporWeb({
   return (
     <div className="rap">
       <GayaRapor />
+      <MerekSekolah />
       <header className="rap-kepala">
         <div>
           <div className="kecil">RAPOR PERKEMBANGAN</div>

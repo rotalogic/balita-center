@@ -182,6 +182,7 @@ export default function KeuanganPage() {
           Buat Tagihan Per Anak
         </button>
       </article>
+      <KartuSemuaTagihan />
       <DataSection
         title="Tagihan Terbaru"
         rows={data ? data.invoices : null}
@@ -265,5 +266,93 @@ export default function KeuanganPage() {
         </p>
       </div>
     </>
+  );
+}
+
+type BarisTagihan = {
+  id: string; invoice_number: string | null; status: string; description: string | null;
+  amount: number; periode: string; due_date: string | null; child_name: string;
+  class_name: string | null; paid_total: number; receipt_id: string | null;
+};
+
+function KartuSemuaTagihan() {
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState("");
+  const [periode, setPeriode] = useState("");
+  const [halaman, setHalaman] = useState(1);
+  const [hasil, setHasil] = useState<{ rows: BarisTagihan[]; total: number } | null>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const p = new URLSearchParams();
+      if (q) p.set("q", q);
+      if (status) p.set("status", status);
+      if (periode) p.set("periode", periode);
+      p.set("halaman", String(halaman));
+      fetch(`/api/keuangan/tagihan?${p.toString()}`)
+        .then((r) => r.json())
+        .then((d) => (d.ok ? setHasil({ rows: d.rows, total: d.total }) : setHasil({ rows: [], total: 0 })))
+        .catch(() => setHasil({ rows: [], total: 0 }));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q, status, periode, halaman]);
+
+  const totalHalaman = hasil ? Math.max(1, Math.ceil(hasil.total / 25)) : 1;
+  const LABEL: Record<string, string> = { belum_bayar: "Belum Bayar", menunggu_konfirmasi: "Sebagian / Menunggu", lunas: "Lunas", batal: "Batal" };
+
+  return (
+    <article className="card" style={{ marginBottom: 16 }}>
+      <h2 style={{ marginTop: 0 }}>Semua Tagihan</h2>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Cari menurut nama anak atau nomor tagihan, saring menurut status dan periode — seluruh tagihan terjangkau dari sini.
+      </p>
+      <div className="row" style={{ gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+        <input aria-label="Cari tagihan" placeholder="Cari nama anak / nomor tagihan…" value={q}
+          onChange={(e) => { setQ(e.target.value); setHalaman(1); }} style={{ flex: "1 1 240px" }} />
+        <select aria-label="Status tagihan" value={status} onChange={(e) => { setStatus(e.target.value); setHalaman(1); }}>
+          <option value="">Semua status</option>
+          <option value="belum_bayar">Belum Bayar</option>
+          <option value="menunggu_konfirmasi">Sebagian / Menunggu</option>
+          <option value="lunas">Lunas</option>
+          <option value="batal">Batal</option>
+        </select>
+        <input aria-label="Periode tagihan" type="month" value={periode} onChange={(e) => { setPeriode(e.target.value); setHalaman(1); }} />
+      </div>
+      {!hasil ? <p className="muted">Memuat…</p> : hasil.rows.length === 0 ? (
+        <p className="muted">Tidak ada tagihan yang cocok dengan pencarian ini.</p>
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Anak</th><th>Nomor</th><th>Periode</th><th>Nominal</th><th>Terbayar</th><th>Sisa</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              {hasil.rows.map((r) => (
+                <tr key={r.id}>
+                  <td><strong>{r.child_name}</strong>{r.class_name ? <span className="muted"> · {r.class_name}</span> : null}</td>
+                  <td className="muted">{r.invoice_number || "-"}</td>
+                  <td>{r.periode}</td>
+                  <td>{rupiahFmt(r.amount)}</td>
+                  <td>{rupiahFmt(r.paid_total)}</td>
+                  <td>{rupiahFmt(Math.max(0, r.amount - r.paid_total))}</td>
+                  <td><StatusBadge status={r.status} /></td>
+                  <td style={{ whiteSpace: "nowrap" }}>
+                    <a className="btn small secondary" href={`/tagihan/${r.id}/cetak`} target="_blank" rel="noreferrer">Cetak</a>
+                    {r.status === "lunas" && r.receipt_id ? (
+                      <a className="btn small secondary" href={`/kwitansi/${r.id}/cetak`} target="_blank" rel="noreferrer" style={{ marginLeft: 6 }}>Kwitansi</a>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="row" style={{ marginTop: 10, alignItems: "center" }}>
+        <span className="muted">{hasil ? `${hasil.total} tagihan` : ""} · Halaman {halaman} dari {totalHalaman}</span>
+        <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <button type="button" className="btn small secondary" disabled={halaman <= 1} onClick={() => setHalaman(halaman - 1)}>Sebelumnya</button>
+          <button type="button" className="btn small secondary" disabled={halaman >= totalHalaman} onClick={() => setHalaman(halaman + 1)}>Berikutnya</button>
+        </span>
+      </div>
+    </article>
   );
 }

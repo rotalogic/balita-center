@@ -39,6 +39,8 @@ psql "$DATABASE_URL" -f database/migrasi-ailsa-kunci.sql
 psql "$DATABASE_URL" -f database/migrasi-ailsa-channel.sql
 psql "$DATABASE_URL" -f database/migrasi-gateway.sql
 psql "$DATABASE_URL" -f database/migrasi-identitas.sql
+psql "$DATABASE_URL" -f database/migrasi-gateway-order.sql
+psql "$DATABASE_URL" -f database/migrasi-status-tagihan.sql
 ```
 
 Semua migrasi memakai `IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`,
@@ -72,6 +74,22 @@ npm run build
 # systemctl restart balita-center
 curl -s https://balita.rotalogic.id/api/health   # harus {"ok":true,"db":"ok"}
 ```
+
+**Penting — mode standalone:** aplikasi dibangun dengan `output: "standalone"`.
+Bila server dijalankan dari `.next/standalone/server.js`, folder `public/` dan
+`.next/static` TIDAK ikut tersalin otomatis dan harus disalin manual setiap
+deploy, kalau tidak gambar ilustrasi (`/ilustrasi/...`) dan aset statis akan
+404 (gejala: gambar rusak di laporan web):
+
+```bash
+cp -r public .next/standalone/public
+mkdir -p .next/standalone/.next
+cp -r .next/static .next/standalone/.next/static
+```
+
+Verifikasi sesudah restart (dengan sesi login): buka
+`https://balita.rotalogic.id/ilustrasi/sampul-laporan.jpg` — harus tampil
+gambar, bukan 404. Smoke test (langkah 10) juga memeriksanya otomatis.
 
 ## 6. Pasang cron job tagihan
 

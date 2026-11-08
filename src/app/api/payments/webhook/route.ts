@@ -35,19 +35,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, diterima: true, diproses: false, status: body.transaction_status || null });
     }
 
+    // Order penuh memakai nomor tagihan; order sebagian (cicilan) memakai
+    // nomor tagihan + akhiran "-P-<penanda>".
+    const nomorTagihan = String(body.order_id || "").split("-P-")[0];
     const inv = await query<{ id: string; amount: string }>(
       "SELECT id, amount FROM invoices WHERE invoice_number = $1",
-      [body.order_id]
+      [nomorTagihan]
     );
     if (!inv[0]) {
       return NextResponse.json({ ok: true, diterima: true, diproses: false, alasan: "tagihan tidak ditemukan" });
     }
-    // Jumlah harus persis sama dengan tagihan.
-    if (Math.round(Number(body.gross_amount)) !== Math.round(Number(inv[0].amount))) {
-      return NextResponse.json({ ok: true, diterima: true, diproses: false, alasan: "jumlah tidak sama dengan tagihan" });
+    const gross = Math.round(Number(body.gross_amount));
+    const paidRows = await query<{ total: string }>(
+      "SELECT COALESCE(SUM(amount),0) AS total FROM payments WHERE invoice_id = $1 AND status = 'terkonfirmasi'",
+      [inv[0].id]
+    );
+    const sisa = Math.round(Number(inv[0].amount)) - Number(paidRows[0].total);
+    // Jumlah harus positif dan tidak melebihi sisa tagihan.
+    if (!(gross > 0) || gross > sisa) {
+      return NextResponse.json({ ok: true, diterima: true, diproses: false, alasan: "jumlah melebihi sisa tagihan" });
     }
-    const hasil = await lunasiDariGateway(inv[0].id, body.payment_type || "gateway");
-    return NextResponse.json({ ok: true, diterima: true, diproses: hasil.ok, sudah_lunas: Boolean(hasil.sudah) });
+    const hasil = await lunasiDariGateway(inv[0].id, body.payment_type || "gateway", gross, body.order_id);
+    return NextResponse.json({ ok: true, diterima: true, diproses: hasil.ok, sudah_lunas: Boolean(hasil.sudah), lunas: Boolean(hasil.lunas), sisa: hasil.sisa ?? null });
   } catch (error) {
     return NextResponse.json({ ok: false, error: (error as Error)?.message }, { status: 500 });
   }

@@ -112,30 +112,56 @@ export async function verifikasiNotifikasi(body: {
 // Tandai tagihan lunas dari pembayaran gateway — langkah yang sama dengan
 // konfirmasi manual staf: Buku Kas, baris pembayaran, status, kwitansi.
 // Idempotent: tagihan yang sudah lunas tidak diproses ulang.
-export async function lunasiDariGateway(invoiceId: string, metode: string): Promise<{ ok: boolean; sudah?: boolean }> {
+export async function lunasiDariGateway(
+  invoiceId: string,
+  metode: string,
+  jumlah?: number,
+  orderId?: string
+): Promise<{ ok: boolean; sudah?: boolean; lunas?: boolean; sisa?: number }> {
   const inv = await query<{ branch_id: string; amount: string; status: string }>(
     "SELECT branch_id, amount, status FROM invoices WHERE id = $1::uuid",
     [invoiceId]
   );
   if (!inv[0]) return { ok: false };
-  if (inv[0].status === "lunas") return { ok: true, sudah: true };
-  const amount = Number(inv[0].amount);
+  if (inv[0].status === "lunas") return { ok: true, sudah: true, lunas: true, sisa: 0 };
+  // Idempotensi: notifikasi yang sama tidak tercatat dua kali.
+  if (orderId) {
+    const dupe = await query<{ id: string }>(
+      "SELECT id FROM payments WHERE gateway_order_id = $1 LIMIT 1",
+      [orderId]
+    ).catch(() => []);
+    if (dupe.length) return { ok: true, sudah: true };
+  }
+  const totalTagihan = Number(inv[0].amount);
+  const bayar = Math.round(jumlah && jumlah > 0 ? jumlah : totalTagihan);
   const cash = await query<{ id: string }>(
     `INSERT INTO cash_book_entries (branch_id, entry_date, direction, category, description, amount, source_type, source_id, created_by)
      VALUES ($1, CURRENT_DATE, 'masuk', 'SPP', 'Pembayaran SPP via gateway Midtrans', $2, 'tagihan', $3, NULL) RETURNING id`,
-    [inv[0].branch_id, amount, invoiceId]
+    [inv[0].branch_id, bayar, invoiceId]
   );
   await query(
-    `INSERT INTO payments (branch_id, invoice_id, method, amount, status, paid_at, confirmed_by, cash_entry_id)
-     VALUES ($1, $2, $3, $4, 'terkonfirmasi', CURRENT_TIMESTAMP, NULL, $5)`,
-    [inv[0].branch_id, invoiceId, metode.slice(0, 24) || "gateway", amount, cash[0].id]
+    `INSERT INTO payments (branch_id, invoice_id, method, amount, status, paid_at, confirmed_by, cash_entry_id, gateway_order_id)
+     VALUES ($1, $2, $3, $4, 'terkonfirmasi', CURRENT_TIMESTAMP, NULL, $5, $6)`,
+    [inv[0].branch_id, invoiceId, metode.slice(0, 24) || "gateway", bayar, cash[0].id, orderId || null]
   );
-  await query("UPDATE invoices SET status = 'lunas' WHERE id = $1::uuid", [invoiceId]);
-  await query(
-    `INSERT INTO receipts (invoice_id, branch_id, amount, method, received_by, paid_at)
-     SELECT $1::uuid, $2::uuid, $3::numeric, $4, NULL, CURRENT_DATE
-      WHERE NOT EXISTS (SELECT 1 FROM receipts WHERE invoice_id = $1::uuid)`,
-    [invoiceId, inv[0].branch_id, amount, metode.slice(0, 24) || "gateway"]
-  ).catch(() => null);
-  return { ok: true };
+  const paid = await query<{ total: string }>(
+    "SELECT COALESCE(SUM(amount),0) AS total FROM payments WHERE invoice_id = $1 AND status = 'terkonfirmasi'",
+    [invoiceId]
+  );
+  const terbayar = Number(paid[0].total);
+  const sisa = Math.max(0, totalTagihan - terbayar);
+  if (sisa <= 0) {
+    await query("UPDATE invoices SET status = 'lunas' WHERE id = $1::uuid", [invoiceId]);
+    await query(
+      `INSERT INTO receipts (invoice_id, branch_id, amount, method, received_by, paid_at)
+       SELECT $1::uuid, $2::uuid, $3::numeric, $4, NULL, CURRENT_DATE
+        WHERE NOT EXISTS (SELECT 1 FROM receipts WHERE invoice_id = $1::uuid)`,
+      [invoiceId, inv[0].branch_id, terbayar, metode.slice(0, 24) || "gateway"]
+    ).catch(() => null);
+    return { ok: true, lunas: true, sisa: 0 };
+  }
+  // Belum lunas: tagihan tercatat sebagian terbayar (pola yang sama dengan
+  // konfirmasi manual staf).
+  await query("UPDATE invoices SET status = 'menunggu_konfirmasi' WHERE id = $1::uuid AND status = 'belum_bayar'", [invoiceId]);
+  return { ok: true, lunas: false, sisa };
 }

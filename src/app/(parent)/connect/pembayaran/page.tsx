@@ -12,6 +12,7 @@ type SnapWindow = Window & { snap?: { pay: (token: string, opsi: Record<string, 
 export default function ConnectPembayaranPage() {
   const { data, error } = useConnect();
   const [sibuk, setSibuk] = useState("");
+  const [nominal, setNominal] = useState<Record<string, string>>({});
 
   // Muat Snap.js Midtrans sekali bila gateway aktif.
   useEffect(() => {
@@ -31,11 +32,11 @@ export default function ConnectPembayaranPage() {
   const openTotal = open.reduce((sum, i) => sum + Math.max(0, Number(i.amount || 0) - Number(i.paid_total || 0)), 0);
   const gatewayAktif = Boolean(data.gateway?.aktif);
 
-  async function bayar(id: string) {
+  async function bayar(id: string, jumlah?: number) {
     setSibuk(id);
     try {
       const r = await fetch("/api/connect/bayar", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoice_id: id }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ invoice_id: id, jumlah }),
       });
       const d = await r.json();
       if (!d.ok) { window.alert(d.error || "Gagal memulai pembayaran."); return; }
@@ -79,9 +80,20 @@ export default function ConnectPembayaranPage() {
                     {String(i.status) === "lunas" ? (
                       <a className="btn small secondary" href={`/kwitansi/${String(i.id)}/cetak`} target="_blank" rel="noreferrer">Lihat Kwitansi</a>
                     ) : gatewayAktif && String(i.status) !== "batal" ? (
-                      <button type="button" className="btn small" disabled={sibuk === String(i.id)} onClick={() => void bayar(String(i.id))}>
-                        {sibuk === String(i.id) ? "Menyiapkan…" : "Bayar Sekarang"}
-                      </button>
+                      <span style={{ display: "inline-flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                        <input
+                          type="number" min={1000} max={Math.max(0, Number(i.amount || 0) - Number(i.paid_total || 0))}
+                          aria-label="Nominal pembayaran"
+                          placeholder={String(Math.max(0, Number(i.amount || 0) - Number(i.paid_total || 0)))}
+                          value={nominal[String(i.id)] ?? ""}
+                          onChange={(e) => setNominal({ ...nominal, [String(i.id)]: e.target.value })}
+                          style={{ width: 120 }}
+                        />
+                        <button type="button" className="btn small" disabled={sibuk === String(i.id)}
+                          onClick={() => void bayar(String(i.id), nominal[String(i.id)] ? Number(nominal[String(i.id)]) : undefined)}>
+                          {sibuk === String(i.id) ? "Menyiapkan…" : "Bayar"}
+                        </button>
+                      </span>
                     ) : (
                       <span className="muted">—</span>
                     )}
@@ -93,7 +105,7 @@ export default function ConnectPembayaranPage() {
         </div>
       )}
       {gatewayAktif ? (
-        <p className="notice">Pembayaran online aktif: klik <strong>Bayar Sekarang</strong> untuk membayar via transfer bank, e-wallet, atau kartu melalui Midtrans. Status tagihan dan kwitansi terbit otomatis begitu pembayaran berhasil. Pembayaran manual via administrasi tetap diterima.</p>
+        <p className="notice">Pembayaran online aktif: isi nominal (boleh <strong>sebagian</strong>, minimal Rp 1.000 — kosongkan untuk melunasi sisa penuh) lalu klik <strong>Bayar</strong> untuk membayar via transfer bank, e-wallet, atau kartu melalui Midtrans. Status tagihan terbarui otomatis dan kwitansi terbit begitu tagihan lunas. Pembayaran manual via administrasi tetap diterima.</p>
       ) : (
         <p className="notice">Pembayaran online belum diaktifkan sekolah. Silakan bayar via transfer ke Virtual Account sekolah atau tunai/QRIS di administrasi — konfirmasi dicatat staf di modul Keuangan dan status tagihan di sini berubah mengikuti data yang sama. Kwitansi resmi dapat dibuka dari tombol Lihat Kwitansi pada tagihan yang sudah lunas.</p>
       )}

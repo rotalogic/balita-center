@@ -73,6 +73,10 @@ export default async function CetakKwitansi({ params }: { params: { id: string }
       <div className="lembar cap">
         <div className="baris">
           <div>
+            {identitas.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={identitas.logo_url} alt={`Logo ${identitas.nama}`} style={{ height: 46, maxWidth: 170, objectFit: "contain", marginBottom: 4 }} />
+            ) : null}
             <div className="merek">{identitas.nama.toUpperCase()}</div>
             <div className="cabang">{identitas.tagline} — Cabang {k.branch_name}</div>
           </div>

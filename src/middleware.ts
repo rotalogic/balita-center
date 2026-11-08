@@ -15,7 +15,10 @@ export async function middleware(request: NextRequest) {
   // Webhook payment gateway diautentikasi oleh signature Midtrans yang
   // diverifikasi di route-nya, bukan sesi pengguna.
   const webhookGateway = pathname.startsWith("/api/payments/");
-  const publicApi = pathname.startsWith("/api/auth/") || pathname.startsWith("/api/whatsapp/") || pathname === "/api/health" || jobDenganToken || webhookGateway;
+  // Identitas sekolah (nama + logo) bersifat publik — tampil di layar login
+  // sebelum pengguna masuk; tidak memuat data pribadi apa pun.
+  const identitasPublik = pathname === "/api/identitas" || pathname === "/api/identitas/logo";
+  const publicApi = pathname.startsWith("/api/auth/") || pathname.startsWith("/api/whatsapp/") || pathname === "/api/health" || jobDenganToken || webhookGateway || identitasPublik;
   if (PUBLIC_PAGES.includes(pathname) || publicApi) {
     return NextResponse.next();
   }

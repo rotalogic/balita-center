@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ ok: false, error: "Belum masuk." }, { status: 401 });
   try {
-    const body = (await request.json()) as { invoice_id?: string };
+    const body = (await request.json()) as { invoice_id?: string; jumlah?: number };
     if (!body.invoice_id) return NextResponse.json({ ok: false, error: "Tagihan wajib dipilih." }, { status: 400 });
 
     const inv = await query<{
@@ -40,10 +40,26 @@ export async function POST(request: Request) {
     if (!(await gatewaySiap())) {
       return NextResponse.json({ ok: false, error: "Pembayaran online belum diaktifkan sekolah. Silakan bayar via transfer dan konfirmasi ke administrasi." }, { status: 409 });
     }
+    // Sisa tagihan = nominal dikurangi pembayaran terkonfirmasi sebelumnya.
+    const paidRows = await query<{ total: string }>(
+      "SELECT COALESCE(SUM(amount),0) AS total FROM payments WHERE invoice_id = $1 AND status = 'terkonfirmasi'",
+      [inv[0].id]
+    );
+    const sisa = Math.round(Number(inv[0].amount)) - Number(paidRows[0].total);
+    if (sisa <= 0) return NextResponse.json({ ok: false, error: "Tagihan ini sudah terbayar penuh." }, { status: 409 });
+    const jumlah = body.jumlah !== undefined ? Math.round(Number(body.jumlah)) : sisa;
+    if (!Number.isFinite(jumlah) || jumlah < 1000) {
+      return NextResponse.json({ ok: false, error: "Nominal pembayaran minimal Rp 1.000." }, { status: 400 });
+    }
+    if (jumlah > sisa) {
+      return NextResponse.json({ ok: false, error: `Nominal melebihi sisa tagihan (Rp ${sisa.toLocaleString("id-ID")}).` }, { status: 400 });
+    }
+    const nomor = inv[0].invoice_number || `INV-${inv[0].id.slice(0, 8)}`;
+    const orderId = jumlah >= sisa ? nomor : `${nomor}-P-${Date.now().toString(36)}`;
     const k = await segarkanGateway();
     const hasil = await buatTokenSnap({
-      orderId: inv[0].invoice_number || `INV-${inv[0].id.slice(0, 8)}`,
-      jumlah: Number(inv[0].amount),
+      orderId,
+      jumlah,
       namaWali: wali[0].full_name,
       emailWali: user.email,
       keterangan: inv[0].description || `SPP ${inv[0].child_name}`,

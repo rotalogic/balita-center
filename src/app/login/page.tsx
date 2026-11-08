@@ -1,5 +1,7 @@
 "use client";
 
+import { MerekAplikasi } from "@/components/merek-sekolah";
+
 import { useState } from "react";
 import Link from "next/link";
 
@@ -87,8 +89,7 @@ export default function LoginPage() {
         {stage === "credentials" ? (
           <form className="login-card" onSubmit={submitCredentials}>
             <div className="brand" style={{ padding: 0 }}>
-              <span className="brand-mark" aria-hidden="true">✿</span>
-              <span className="brand-name">Balita Center</span>
+              <MerekAplikasi />
             </div>
             <h1 style={{ fontSize: 24, marginTop: 14 }}>Selamat Datang</h1>
             <p className="muted" style={{ marginTop: 4 }}>Masuk untuk melanjutkan ke ruang kerja Anda.</p>
@@ -135,8 +136,7 @@ export default function LoginPage() {
         ) : (
           <form className="login-card" onSubmit={submitCode}>
             <div className="brand" style={{ padding: 0 }}>
-              <span className="brand-mark" aria-hidden="true">✿</span>
-              <span className="brand-name">Balita Center</span>
+              <MerekAplikasi />
             </div>
             <h1 style={{ fontSize: 24, marginTop: 14 }}>Verifikasi 2FA</h1>
             <p className="muted" style={{ marginTop: 4 }}>

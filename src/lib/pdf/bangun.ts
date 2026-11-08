@@ -96,7 +96,7 @@ export async function bangunPdfLaporan(r: BarisLaporan, reportId: string, asal: 
 
 type BarisRapor = Record<string, string | null> & { child_id: string; cycle_start: string; cycle_end: string };
 
-export async function bangunPdfRapor(r: BarisRapor, reportId: string, asal: string, cookie: string): Promise<Buffer> {
+export async function bangunPdfRapor(r: BarisRapor, reportId: string, asal: string, cookie: string, pratinjau = false): Promise<Buffer> {
   const agregat = await agregatRapor(r.child_id, r.cycle_start, r.cycle_end, reportId);
   const fotoBuffers = await Promise.all(
     agregat.foto.map((f) => muatBerkas((f.media_type === "video" ? f.poster_url : f.url) ?? null, asal, cookie))
@@ -127,6 +127,7 @@ export async function bangunPdfRapor(r: BarisRapor, reportId: string, asal: stri
     ilustrasi,
     ttd,
     logo,
+    pratinjau,
   });
   return kumpulkan(doc);
 }

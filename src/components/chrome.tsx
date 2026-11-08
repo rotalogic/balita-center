@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { MerekAplikasi } from "./merek-sekolah";
 
 type Me = {
   full_name: string;
@@ -74,8 +75,7 @@ function Sidebar({
   return (
     <aside className="sidebar">
       <div className="brand">
-        <span className="brand-mark" aria-hidden="true">✿</span>
-        <span className="brand-name">Balita<br />Center</span>
+        <MerekAplikasi />
       </div>
       <nav className="menu" aria-label="Navigasi utama">
         {visible.map(([href, label, icon]) => {

@@ -14,6 +14,7 @@ type Data = {
   photos?: Array<Buffer | null>; // sejajar agregat.foto
   sekolah_kop?: string; // baris kop dari identitas sekolah, mis. "BALITA CENTER — MONTESSORI & CHILDCARE"
   logo?: Buffer | null; // logo sekolah dari identitas (digambar di kepala dokumen)
+  pratinjau?: boolean; // true untuk draf: pita penanda DRAF digambar mencolok
   ttd?: Buffer | null; // tanda tangan digital guru pembuat rapor
   banner?: Buffer | null; // ilustrasi sampul rapor (public/ilustrasi/sampul-rapor.jpg)
   ilustrasi?: Buffer | null; // pengisi Dokumentasi bila belum ada foto (sampul-laporan.jpg)
@@ -125,6 +126,15 @@ export function buatPdfRapor(d: Data): PDFKit.PDFDocument {
     yi += 14;
   }
   y += hIdent + 20;
+
+  if (d.pratinjau) {
+    doc.save();
+    doc.roundedRect(kiri, y - 8, lebar, 19, 5).fill("#b3261e");
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(9)
+      .text("PRATINJAU DRAF — dokumen ini belum diterbitkan dan bukan dokumen resmi", kiri, y - 3, { width: lebar, align: "center", characterSpacing: 0.6 });
+    doc.restore();
+    y += 20;
+  }
 
   if (d.banner) {
     try {
