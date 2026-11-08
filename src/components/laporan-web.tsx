@@ -166,6 +166,10 @@ function GayaLaporan() {
       .lap-chip.mode { background: #fbf6df; color: #857017; }
       .lap-catatan { margin: 13px 0 0; color: #3c454e; }
       .lap-catatan strong { color: #232a31; }
+      .lap-sampul { margin-top: 16px; }
+      .lap-sampul img { width: 100%; height: 190px; object-fit: cover; border-radius: 16px; display: block; }
+      @media (max-width: 640px) { .lap-sampul img { height: 130px; } }
+      .lap-mini .ilus { width: 100%; height: 96px; object-fit: cover; border-radius: 10px; display: block; margin-bottom: 11px; }
       .lap-foto { margin-top: 13px; }
       .lap-foto img { width: min(500px, 100%); border-radius: 12px; display: block; }
       .lap-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
@@ -236,6 +240,8 @@ export function LaporanWeb({
         </div>
       </header>
 
+      <div className="lap-sampul"><img src="/ilustrasi/sampul-laporan.jpg" alt="Ilustrasi anak bermain material Montessori di kelas" /></div>
+
       <section className="lap-seksi">
         <h2><Ikon d={JALUR.denyut} size={19} warna="#1d7fa8" /> Aktivitas &amp; Pembelajaran</h2>
         <p className="lap-sub">Skala penilaian: 1–4 bintang (4 = sempurna) <Ikon d={JALUR.info} size={15} warna="#7fa6bd" /></p>
@@ -272,12 +278,14 @@ export function LaporanWeb({
 
       <div className="lap-grid2">
         <article className="lap-mini">
+          <img className="ilus" src="/ilustrasi/makan-bersama.jpg" alt="Ilustrasi anak makan bersama" loading="lazy" />
           <div className="label" style={{ color: "#cf3365" }}>🍴 MAKAN</div>
           <div className="besar">{makanBesar}</div>
           {report.meals_text && report.meal_level ? <div className="sub">{PORSI[report.meal_level] || report.meal_level}</div> : null}
           {report.snack_text ? <div className="sub">Snack: {report.snack_text}{report.snack_level ? ` · ${PORSI[report.snack_level] || report.snack_level}` : ""}</div> : null}
         </article>
         <article className="lap-mini">
+          <img className="ilus" src="/ilustrasi/tidur-siang.jpg" alt="Ilustrasi anak tidur siang" loading="lazy" />
           <div className="label" style={{ color: "#5b54c7" }}><Ikon d={JALUR.bulan} size={15} warna="#5b54c7" /> TIDUR</div>
           <div className="besar">{napTeks}</div>
           {(report.nap_start || report.nap_end) && report.nap_quality ? <div className="sub">{NAP[report.nap_quality] || report.nap_quality}</div> : null}

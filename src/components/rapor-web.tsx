@@ -41,6 +41,9 @@ function GayaRapor() {
       .rap-kartu .judul { font-weight: 700; font-size: 15px; color: #191d22; }
       .rap-kartu p { margin: 5px 0 0; color: #3c454e; font-size: 14.5px; }
       .rap-krem { background: #fdfbf1; border-left: 4px solid #d9a92c; border-radius: 6px; padding: 14px 18px; margin-top: 12px; color: #2f353c; font-size: 14.5px; }
+      .rap-sampul { margin-top: 16px; }
+      .rap-sampul img { width: 100%; height: 180px; object-fit: cover; border-radius: 14px; display: block; }
+      @media (max-width: 640px) { .rap-sampul img { height: 120px; } }
       .rap-foto { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 12px; }
       @media (max-width: 640px) { .rap-foto { grid-template-columns: repeat(2, 1fr); } .rap-grid2 { grid-template-columns: 1fr !important; } }
       .rap-foto figure { margin: 0; background: #faf7f2; border-radius: 10px; overflow: hidden; }
@@ -90,6 +93,8 @@ export function RaporWeb({
           <div className="rap-kanan"><a className="rap-pil" href={pdfUrl}>⭳ PDF</a></div>
         ) : null}
       </header>
+
+      <div className="rap-sampul"><img src="/ilustrasi/sampul-rapor.jpg" alt="Ilustrasi guru membacakan buku bersama anak di taman sekolah" /></div>
 
       {stppa.length > 0 ? (
         <section className="rap-seksi">
@@ -144,6 +149,16 @@ export function RaporWeb({
               </figure>
             ))}
           </div>
+        </section>
+      ) : null}
+
+      {agregat.foto.length === 0 ? (
+        <section className="rap-seksi">
+          <h2>Dokumentasi Kegiatan</h2>
+          <figure style={{ margin: "12px 0 0", background: "#faf7f2", borderRadius: 10, overflow: "hidden" }}>
+            <img src="/ilustrasi/sampul-laporan.jpg" alt="Ilustrasi kegiatan Montessori" loading="lazy" style={{ width: "100%", height: 170, objectFit: "cover", display: "block" }} />
+            <figcaption style={{ fontSize: 12, color: "#77828e", padding: "6px 10px" }}>Ilustrasi — dokumentasi foto belum ditambahkan guru pada siklus ini.</figcaption>
+          </figure>
         </section>
       ) : null}
 
