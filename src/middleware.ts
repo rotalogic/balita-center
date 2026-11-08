@@ -9,7 +9,10 @@ export async function middleware(request: NextRequest) {
 
   // /api/whatsapp/webhook diautentikasi oleh tanda tangan Meta (X-Hub-Signature-256),
   // bukan sesi pengguna — jadi harus lolos dari middleware.
-  const publicApi = pathname.startsWith("/api/auth/") || pathname.startsWith("/api/whatsapp/") || pathname === "/api/health";
+  // /api/jobs/* diautentikasi oleh header x-job-token yang divalidasi di dalam
+  // route-nya sendiri; tanpa pengecualian ini cron tidak akan pernah sampai.
+  const jobDenganToken = pathname.startsWith("/api/jobs/") && Boolean(request.headers.get("x-job-token"));
+  const publicApi = pathname.startsWith("/api/auth/") || pathname.startsWith("/api/whatsapp/") || pathname === "/api/health" || jobDenganToken;
   if (PUBLIC_PAGES.includes(pathname) || publicApi) {
     return NextResponse.next();
   }

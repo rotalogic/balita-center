@@ -3,10 +3,14 @@ import { query } from "@/lib/db";
 import { guard } from "@/lib/current-user";
 import { catatAudit } from "@/lib/audit";
 import { whatsappConfigured } from "@/lib/whatsapp";
+import { smtpConfigured, emailTagihan, emailPengingatTagihan, type InfoTagihanEmail } from "@/lib/mail";
+import { pdfTagihanBuffer, rupiah } from "@/lib/pdf/tagihan";
 
 export const dynamic = "force-dynamic";
 
 // Job tagihan SPP bulanan + pengingat H-3 & H+1.
+// Kanal pemberitahuan: dalam aplikasi selalu; email ke wali (lampiran PDF)
+// bila SMTP server terisi; WhatsApp hanya bila kanal Meta aktif.
 // Dijalankan cron (header x-job-token) atau manual oleh Super Admin dari aplikasi.
 // Aman diulang: indeks unik (child_id, period_month) mencegah tagihan ganda, dan
 // invoice_notifications unik per (invoice, jenis, kanal) mencegah pengingat ganda.
@@ -17,10 +21,82 @@ function periodeBerikut(): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+const fmtTgl = (iso: string | null) =>
+  !iso
+    ? "-"
+    : new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" })
+        .format(new Date(`${String(iso).slice(0, 10)}T00:00:00+07:00`));
+
+// Kanal email: mengirim tagihan/pengingat ke email wali dengan lampiran PDF.
+// Selalu tercatat di invoice_notifications (channel 'email') — terkirim,
+// menunggu_kanal (SMTP belum diisi), tanpa_email, atau gagal. Kegagalan
+// email tidak pernah menggagalkan job.
+async function kirimEmailTagihan(invoiceId: string, jenis: "terbit" | "h3" | "h1") {
+  try {
+    const sudah = await query<{ status: string }>(
+      "SELECT status FROM invoice_notifications WHERE invoice_id = $1::uuid AND jenis = $2 AND channel = 'email'",
+      [invoiceId, jenis]
+    );
+    if (sudah[0]?.status === "terkirim") return;
+
+    const wali = await query<{ full_name: string; email: string }>(
+      `SELECT g.full_name, g.email FROM invoices i
+         JOIN child_guardians cg ON cg.child_id = i.child_id
+         JOIN guardians g ON g.id = cg.guardian_id
+        WHERE i.id = $1::uuid AND g.email IS NOT NULL AND g.email <> ''
+        ORDER BY cg.is_primary DESC`,
+      [invoiceId]
+    );
+
+    let status: string;
+    let note: string;
+    if (wali.length === 0) {
+      status = "tanpa_email";
+      note = "tidak ada email wali tercatat";
+    } else if (!smtpConfigured()) {
+      status = "menunggu_kanal";
+      note = "SMTP belum dikonfigurasi di server";
+    } else {
+      const paket = await pdfTagihanBuffer(invoiceId).catch(() => null);
+      let terkirim = 0;
+      let alasanGagal = "";
+      for (const w of wali) {
+        const info: InfoTagihanEmail = {
+          wali: w.full_name,
+          anak: paket?.data.child_name || "Anak",
+          nomor: paket?.data.invoice_number || null,
+          keterangan: paket?.data.description || "SPP Balita Center",
+          jumlah: paket ? rupiah(paket.data.amount) : "-",
+          jatuhTempo: fmtTgl(paket?.data.due_date || null),
+          cabang: paket?.data.branch_name || "-",
+          tautan: `${process.env.APP_BASE_URL || ""}/connect/pembayaran`,
+        };
+        const hasil = jenis === "terbit"
+          ? await emailTagihan(w.email, info, paket?.buffer)
+          : await emailPengingatTagihan(w.email, info, jenis, paket?.buffer);
+        if (hasil.ok) terkirim += 1;
+        else if (!alasanGagal) alasanGagal = hasil.alasan || "gagal";
+      }
+      status = terkirim > 0 ? "terkirim" : "gagal";
+      note = terkirim > 0
+        ? `terkirim ke ${terkirim} email wali${paket ? " + lampiran PDF" : " (PDF gagal dibuat, tanpa lampiran)"}`
+        : `gagal kirim: ${alasanGagal}`;
+    }
+    await query(
+      `INSERT INTO invoice_notifications (invoice_id, jenis, channel, status, note)
+       VALUES ($1::uuid, $2, 'email', $3, $4)
+       ON CONFLICT (invoice_id, jenis, channel) DO UPDATE SET status = EXCLUDED.status, note = EXCLUDED.note`,
+      [invoiceId, jenis, status, note]
+    );
+  } catch {
+    /* email tidak boleh menggagalkan job tagihan */
+  }
+}
+
 async function bolehJalan(request: Request) {
   const token = request.headers.get("x-job-token");
   if (token && process.env.JOB_TOKEN && token === process.env.JOB_TOKEN) return { ok: true as const, user: null };
-  const denied = await guard("finance.update");
+  const denied = await guard("finance.manage");
   if (denied.error) return { ok: false as const, response: denied.error };
   return { ok: true as const, user: denied.user };
 }
@@ -81,6 +157,7 @@ export async function POST(request: Request) {
            VALUES ($1::uuid,'terbit','whatsapp',$2,$3) ON CONFLICT DO NOTHING`,
           [inv.id, kanalAktif ? "terkirim" : "menunggu_kanal", kanalAktif ? "template pengingat_tagihan_spp" : "kanal WhatsApp belum aktif"]
         ).catch(() => null);
+        await kirimEmailTagihan(inv.id, "terbit");
       }
 
       if (izin.user) {
@@ -90,7 +167,7 @@ export async function POST(request: Request) {
           detail: { periode: periode.slice(0, 7), jumlah: dibuat.length, kanal_whatsapp: kanalAktif ? "aktif" : "menunggu_kanal" },
         });
       }
-      return NextResponse.json({ ok: true, periode: periode.slice(0, 7), dibuat: dibuat.length, kanal: kanalAktif ? "aktif" : "menunggu_kanal" });
+      return NextResponse.json({ ok: true, periode: periode.slice(0, 7), dibuat: dibuat.length, kanal: kanalAktif ? "aktif" : "menunggu_kanal", email: smtpConfigured() ? "aktif" : "menunggu_smtp" });
     }
 
     if (aksi === "pengingat") {
@@ -116,8 +193,9 @@ export async function POST(request: Request) {
            VALUES ($1::uuid,$2,'whatsapp',$3,$4) ON CONFLICT DO NOTHING`,
           [t.id, t.jenis, kanalAktif ? "terkirim" : "menunggu_kanal", kanalAktif ? "template pengingat_tagihan_spp" : "kanal WhatsApp belum aktif"]
         ).catch(() => null);
+        await kirimEmailTagihan(t.id, t.jenis as "h3" | "h1");
       }
-      return NextResponse.json({ ok: true, aksi: "pengingat", kandidat: target.length, baru: terkirim, kanal: kanalAktif ? "aktif" : "menunggu_kanal" });
+      return NextResponse.json({ ok: true, aksi: "pengingat", kandidat: target.length, baru: terkirim, kanal: kanalAktif ? "aktif" : "menunggu_kanal", email: smtpConfigured() ? "aktif" : "menunggu_smtp" });
     }
 
     return NextResponse.json({ ok: false, error: "Aksi tidak dikenal (buat | pengingat)." }, { status: 400 });
