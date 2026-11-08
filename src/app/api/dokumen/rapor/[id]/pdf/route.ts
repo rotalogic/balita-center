@@ -71,6 +71,18 @@ export async function GET(request: Request, { params }: { params: { id: string }
   for (const k of KOLOM_NARASI) narratives[k] = r[k] ? String(r[k]) : null;
 
   const banner = await readFile(path.join(process.cwd(), "public/ilustrasi/sampul-rapor.jpg")).catch(() => null);
+  const identitasRapor = await getIdentitas();
+  const logo = await (async () => {
+    const url = identitasRapor.logo_url;
+    if (!url) return null;
+    try {
+      const asal = new URL(request.url).origin;
+      const lokal = !url.startsWith("http");
+      const respon = await fetch(lokal ? `${asal}${url}` : url, lokal ? { headers: { cookie: request.headers.get("cookie") || "" } } : undefined);
+      if (!respon.ok) return null;
+      return Buffer.from(await respon.arrayBuffer());
+    } catch { return null; }
+  })();
   const ttd = await (async () => {
     const url = (r as Record<string, unknown>).teacher_ttd as string | null;
     if (!url) return null;
@@ -95,10 +107,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
     narratives,
     agregat,
     photos: fotoBuffers,
-    sekolah_kop: kopLengkap(await getIdentitas()),
+    sekolah_kop: kopLengkap(identitasRapor),
     banner,
     ilustrasi,
     ttd,
+    logo,
   });
 
   const potongan: Buffer[] = [];

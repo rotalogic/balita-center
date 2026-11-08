@@ -22,6 +22,8 @@ type Data = {
   // sebagai pita gambar sesudah kepala laporan, sama seperti versi web.
   banner?: Buffer | null;
   ttd?: Buffer | null; // tanda tangan digital fasilitator utama
+  logo?: Buffer | null; // logo sekolah dari identitas (digambar di bagian atas)
+  sekolah_kop?: string; // baris kop identitas, mis. "BALITA CENTER — MONTESSORI & CHILDCARE"
 };
 
 const AREA: Record<string, string> = {
@@ -107,6 +109,16 @@ export function buatPdfLaporan(d: Data): PDFKit.PDFDocument {
     doc.font(font).fontSize(ukuran);
     return doc.heightOfString(teks, { width: w, lineGap: 1.5 });
   };
+
+  // ---------- Baris merek (logo sekolah) ----------
+  if (d.logo) {
+    try {
+      doc.image(d.logo, kiri, y, { fit: [120, 30], valign: "center" });
+    } catch { /* logo gagal dimuat — laporan tetap terbit */ }
+    doc.fillColor("#77828e").font("Helvetica-Bold").fontSize(8.5)
+      .text((d.sekolah_kop || "BALITA CENTER — MONTESSORI & CHILDCARE").toUpperCase(), kiri + 132, y + 10, { width: lebar - 132, characterSpacing: 1 });
+    y += 42;
+  }
 
   // ---------- Pita kepala ----------
   const moodLabel = d.mood ? MOOD[d.mood] || d.mood : "";

@@ -13,6 +13,7 @@ type Data = {
   agregat: AgregatRapor;
   photos?: Array<Buffer | null>; // sejajar agregat.foto
   sekolah_kop?: string; // baris kop dari identitas sekolah, mis. "BALITA CENTER — MONTESSORI & CHILDCARE"
+  logo?: Buffer | null; // logo sekolah dari identitas (digambar di kepala dokumen)
   ttd?: Buffer | null; // tanda tangan digital guru pembuat rapor
   banner?: Buffer | null; // ilustrasi sampul rapor (public/ilustrasi/sampul-rapor.jpg)
   ilustrasi?: Buffer | null; // pengisi Dokumentasi bila belum ada foto (sampul-laporan.jpg)
@@ -97,9 +98,16 @@ export function buatPdfRapor(d: Data): PDFKit.PDFDocument {
   };
 
   // ---------- Kepala ----------
-  doc.font("Helvetica-Bold").fontSize(9).fillColor(ABU).text((d.sekolah_kop || "BALITA CENTER — MONTESSORI & CHILDCARE").toUpperCase(), kiri, y, { width: lebar, characterSpacing: 1 });
+  let geserLogo = 0;
+  if (d.logo) {
+    try {
+      doc.image(d.logo, kiri, y - 2, { fit: [104, 38] });
+      geserLogo = 116;
+    } catch { /* logo gagal dimuat — kop teks tetap tampil */ }
+  }
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(ABU).text((d.sekolah_kop || "BALITA CENTER — MONTESSORI & CHILDCARE").toUpperCase(), kiri + geserLogo, y, { width: lebar - geserLogo, characterSpacing: 1 });
   y += 14;
-  doc.font("Helvetica-Bold").fontSize(19).fillColor(GELAP).text("Rapor Perkembangan", kiri, y, { width: lebar });
+  doc.font("Helvetica-Bold").fontSize(19).fillColor(GELAP).text("Rapor Perkembangan", kiri + geserLogo, y, { width: lebar - geserLogo });
   y += 24;
   const barisIdent: Array<[string, string]> = [
     ["Nama Anak", d.child_name],
