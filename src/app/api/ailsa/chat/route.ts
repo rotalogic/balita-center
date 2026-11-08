@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { guard } from "@/lib/current-user";
 import { giliranAilsa } from "@/lib/ailsa/brain";
-import { llmConfigured, llmModel, llmSumber } from "@/lib/ailsa/llm";
+import { llmConfigured, llmModel, llmSumber, segarkanKonfigurasi } from "@/lib/ailsa/llm";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +12,9 @@ export async function POST(request: Request) {
   const denied = await guard("messages.send");
   if (denied.error) return denied.error;
 
+  await segarkanKonfigurasi();
   if (!llmConfigured()) {
-    return NextResponse.json({ ok: false, error: "Otak LLM belum dikonfigurasi (AILSA_LLM_API_KEY kosong)." }, { status: 503 });
+    return NextResponse.json({ ok: false, error: "Otak LLM belum dikonfigurasi. Isi kunci DeepSeek di kartu Kunci LLM pada halaman Ailsa." }, { status: 503 });
   }
   try {
     const body = (await request.json()) as {
@@ -30,8 +31,8 @@ export async function POST(request: Request) {
     );
 
     // Nomor semu per pengguna supaya riwayat obrolan web terpisah dari WhatsApp.
-    // Sesi simulator: nomor semu per pengguna, ditandai agar log terpisah dari WhatsApp.
-    const wa = `simulator-${denied.user.id}`;
+    // Dibatasi 28 karakter: leads.wa_number hanya varchar(32), UUID utuh meluap.
+    const wa = `sim-${denied.user.id.replace(/-/g, "").slice(0, 24)}`;
     const persona = body.persona || "calon";
     const hasil = await giliranAilsa(
       wa,

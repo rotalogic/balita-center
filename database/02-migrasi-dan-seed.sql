@@ -554,3 +554,15 @@ CREATE TABLE IF NOT EXISTS cycle_report_photos (
 
 CREATE INDEX IF NOT EXISTS idx_cycle_report_photos_report
   ON cycle_report_photos (report_id, sort_order, created_at);
+-- Kunci LLM Ailsa yang diisi admin dari halaman Ailsa (pengganti wajib-env).
+-- Kunci tersimpan di bot_settings baris tunggal; tidak pernah ditampilkan
+-- kembali ke peramban selain 4 karakter terakhir.
+ALTER TABLE bot_settings
+  ADD COLUMN IF NOT EXISTS llm_api_key text,
+  ADD COLUMN IF NOT EXISTS llm_model varchar(64),
+  ADD COLUMN IF NOT EXISTS llm_base_url text;
+-- Kolom kanal percakapan bot: kode Simulator Ailsa menulis channel='simulator'
+-- tetapi kolomnya belum pernah ada, sehingga log percakapan simulator selalu
+-- gagal tersimpan (kesalahannya tertelan catch). Nilai lama dianggap WhatsApp.
+ALTER TABLE bot_conversations
+  ADD COLUMN IF NOT EXISTS channel varchar(16) NOT NULL DEFAULT 'whatsapp';

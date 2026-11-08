@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { guard, hasPermission } from "@/lib/current-user";
 import { analisaPerkembangan, draftLaporanHarian } from "@/lib/ailsa/generate";
-import { llmConfigured } from "@/lib/ailsa/llm";
+import { llmConfigured, segarkanKonfigurasi } from "@/lib/ailsa/llm";
 
 export const dynamic = "force-dynamic";
 
@@ -14,8 +14,9 @@ export async function POST(request: Request) {
   if (!hasPermission(denied.user, "daily_reports.create") && !hasPermission(denied.user, "students.view")) {
     return NextResponse.json({ ok: false, error: "Anda tidak berhak membuat laporan/analisa." }, { status: 403 });
   }
+  await segarkanKonfigurasi();
   if (!llmConfigured()) {
-    return NextResponse.json({ ok: false, error: "Otak LLM belum dikonfigurasi." }, { status: 503 });
+    return NextResponse.json({ ok: false, error: "Otak LLM belum dikonfigurasi. Isi kunci DeepSeek di kartu Kunci LLM pada halaman Ailsa." }, { status: 503 });
   }
 
   try {

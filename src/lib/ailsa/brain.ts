@@ -1,7 +1,7 @@
 import { query } from "@/lib/db";
 import { rapikanLead } from "@/lib/lead";
 import { SYSTEM_PROMPT_AILSA } from "./system-prompt";
-import { panggilLLM, parseJsonLonggar, llmConfigured } from "./llm";
+import { panggilLLM, parseJsonLonggar, llmConfigured, segarkanKonfigurasi } from "./llm";
 import { jagaJawaban, rapikanKeluaran, type Keluaran } from "./guard";
 import {
   cariPengetahuan, getBranchInfo, getChildDailyReports, getChildDevelopment,
@@ -177,6 +177,7 @@ export async function giliranAilsa(
     .filter(Boolean)
     .join("\n");
 
+  await segarkanKonfigurasi();
   if (!llmConfigured()) {
     return {
       tool,

@@ -3,7 +3,7 @@ import { query } from "@/lib/db";
 import { guard } from "@/lib/current-user";
 import { catatAudit } from "@/lib/audit";
 import { ADMIN_NUMBER, TEMPLATES, envStatus, provider, whatsappConfigured } from "@/lib/whatsapp";
-import { llmConfigured, llmModel, llmSumber } from "@/lib/ailsa/llm";
+import { llmConfigured, llmModel, llmSumber, segarkanKonfigurasi, llmMasker, llmDariDb } from "@/lib/ailsa/llm";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,13 @@ export async function GET() {
   const denied = await guard("messages.send");
   if (denied.error) return denied.error;
   try {
-    const setelan = await query<Record<string, unknown>>("SELECT * FROM bot_settings WHERE id = 1");
+    await segarkanKonfigurasi();
+    const setelanMentah = await query<Record<string, unknown>>("SELECT * FROM bot_settings WHERE id = 1");
+    // Kunci LLM tidak pernah keluar dari server selain samaran 4 karakter terakhir.
+    const setelan = setelanMentah.map((r) => {
+      const { llm_api_key, ...aman } = r;
+      return { ...aman, llm_key_mask: llm_api_key ? `••••${String(llm_api_key).slice(-4)}` : null };
+    });
     const [terakhir, hitung] = await Promise.all([
       query<{ created_at: string; delivery_status: string | null }>(
         `SELECT created_at, delivery_status FROM bot_conversations
@@ -27,7 +33,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       configured: whatsappConfigured(),
-      llm: { configured: llmConfigured(), model: llmModel(), kunci: llmSumber() },
+      llm: { configured: llmConfigured(), model: llmModel(), kunci: llmSumber(), dariAplikasi: llmDariDb(), masker: llmMasker() },
       env: envStatus(),
       admin_number: ADMIN_NUMBER || null,
       settings: setelan[0] || null,

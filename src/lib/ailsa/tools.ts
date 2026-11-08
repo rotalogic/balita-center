@@ -42,7 +42,7 @@ export async function getPrograms() {
   // programs tidak punya branch_id; biaya berlaku sekolah-wide.
   return query(
     `SELECT name, code, monthly_fee, screening_fee, age_min_months, age_max_months
-       FROM programs WHERE deleted_at IS NULL AND is_active ORDER BY name`
+       FROM programs WHERE deleted_at IS NULL ORDER BY name`
   );
 }
 
@@ -50,7 +50,7 @@ export async function getBranchInfo() {
   // branches tidak menyimpan phone/email/opening_hours di skema ini.
   return query(
     `SELECT name, code, city, address, timezone FROM branches
-      WHERE deleted_at IS NULL AND is_active ORDER BY name`
+      WHERE deleted_at IS NULL ORDER BY name`
   );
 }
 

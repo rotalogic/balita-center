@@ -1,33 +1,80 @@
-// Klien LLM (kompatibel OpenAI chat/completions).
-// Urutan pemakaian (keputusan pemilik 7 Nov 2026): kunci bansos-deepseek DULU,
-// baru pindah ke kunci utama bila kuota/gangguan.
-// Utama  : AILSA_LLM_API_KEY @ AILSA_LLM_BASE_URL (dipakai KEDUA)
-// Pertama: AILSA_LLM_FALLBACK_* (acsa.my.id, bansos-deepseek)
-// Kunci hanya dari env; tidak pernah hardcode.
-const BASE = (process.env.AILSA_LLM_BASE_URL || process.env.LLM_BASE_URL || "https://api.deepseek.com/v1").replace(/\/$/, "");
-const KEY = process.env.AILSA_LLM_API_KEY || process.env.LLM_API_KEY || "";
-const MODEL = process.env.LLM_MODEL || "deepseek-chat";
+// Klien LLM (kompatibel OpenAI chat/completions) — otaknya DeepSeek.
+// Urutan pemakaian:
+// 1) Kunci yang diisi admin dari halaman Ailsa (bot_settings.llm_api_key) —
+//    keputusan pemilik 8 Nov 2026: tanpa Meta, token DeepSeek diisi sendiri.
+// 2) Kunci bansos-deepseek env (keputusan 7 Nov 2026).
+// 3) Kunci env AILSA_LLM_API_KEY @ AILSA_LLM_BASE_URL.
+// Kunci tidak pernah hardcode dan tidak pernah dikembalikan ke peramban
+// selain 4 karakter terakhir.
+import { query } from "@/lib/db";
+
+const ENV_BASE = (process.env.AILSA_LLM_BASE_URL || process.env.LLM_BASE_URL || "https://api.deepseek.com/v1").replace(/\/$/, "");
+const ENV_KEY = process.env.AILSA_LLM_API_KEY || process.env.LLM_API_KEY || "";
+const ENV_MODEL = process.env.LLM_MODEL || "deepseek-chat";
 
 const FBASE = (process.env.AILSA_LLM_FALLBACK_BASE_URL || "").replace(/\/$/, "");
 const FKEY = process.env.AILSA_LLM_FALLBACK_API_KEY || "";
 const FMODEL = process.env.AILSA_LLM_FALLBACK_MODEL || "bansos-deepseek";
 
+type Konfig = { key: string; model: string; base: string; dariDb: boolean };
+let cfg: Konfig = { key: ENV_KEY, model: ENV_MODEL, base: ENV_BASE, dariDb: false };
+let muatTerakhir = 0;
+
+// Muat ulang kunci dari bot_settings (di-cache 15 detik). Dipanggil di awal
+// panggilLLM dan oleh route status/kunci supaya perubahan admin segera aktif
+// tanpa restart server.
+export async function segarkanKonfigurasi(paksa = false): Promise<void> {
+  const kini = Date.now();
+  if (!paksa && kini - muatTerakhir < 15000) return;
+  muatTerakhir = kini;
+  try {
+    const rows = await query<{ llm_api_key: string | null; llm_model: string | null; llm_base_url: string | null }>(
+      "SELECT llm_api_key, llm_model, llm_base_url FROM bot_settings WHERE id = 1"
+    );
+    const r = rows[0];
+    if (r?.llm_api_key) {
+      cfg = {
+        key: r.llm_api_key,
+        model: r.llm_model || ENV_MODEL,
+        base: (r.llm_base_url || ENV_BASE).replace(/\/$/, ""),
+        dariDb: true,
+      };
+    } else {
+      cfg = { key: ENV_KEY, model: ENV_MODEL, base: ENV_BASE, dariDb: false };
+    }
+  } catch {
+    /* database tak terjangkau: pertahankan konfigurasi terakhir */
+  }
+}
+
 export function llmConfigured(): boolean {
-  return Boolean(KEY || FKEY);
+  return Boolean(cfg.key || FKEY);
 }
 
 export function llmModel(): string {
-  return FKEY && FBASE ? `${FMODEL} (utama)` : MODEL;
+  if (cfg.dariDb) return cfg.model;
+  return FKEY && FBASE ? `${FMODEL} (utama)` : cfg.model;
 }
 
-export function llmSumber(): { utama: boolean; cadangan: boolean } {
-  // "utama" = kunci bansos-deepseek yang dipakai lebih dulu.
-  return { utama: Boolean(FKEY && FBASE), cadangan: Boolean(KEY) };
+export function llmSumber(): { utama: boolean; cadangan: boolean; aplikasi: boolean } {
+  return { utama: Boolean(FKEY && FBASE), cadangan: Boolean(ENV_KEY), aplikasi: cfg.dariDb };
+}
+
+export function llmDariDb(): boolean {
+  return cfg.dariDb;
+}
+
+export function llmMasker(): string | null {
+  return cfg.key ? `••••${cfg.key.slice(-4)}` : null;
+}
+
+export function llmBaseAktif(): string {
+  return cfg.base;
 }
 
 export type Pesan = { role: "system" | "user" | "assistant"; content: string };
 
-type Jawaban = { ok: boolean; teks?: string; error?: string; sumber?: "utama" | "cadangan" };
+type Jawaban = { ok: boolean; teks?: string; error?: string; sumber?: "utama" | "cadangan" | "aplikasi" };
 
 // Sebagian gateway (mis. acsa.my.id) selalu membalas SSE walau diminta JSON.
 function bacaSse(teks: string): string {
@@ -93,22 +140,28 @@ async function panggilSatu(opts: {
 }
 
 export async function panggilLLM(pesan: Pesan[], suhu = 0.3): Promise<Jawaban> {
-  // 1) bansos-deepseek lebih dulu (kuota khusus bot).
+  await segarkanKonfigurasi();
+  const gagal: string[] = [];
+
+  // 1) Kunci dari aplikasi (input admin di halaman Ailsa) paling dulu.
+  if (cfg.dariDb && cfg.key) {
+    const r = await panggilSatu({ base: cfg.base, key: cfg.key, model: cfg.model, pesan, suhu, jsonMode: true, batasMs: 30000 });
+    if (r.ok) return { ...r, sumber: "aplikasi" };
+    gagal.push(`kunci aplikasi: ${r.error}`);
+  }
+  // 2) bansos-deepseek (kuota khusus bot). Batas 9 detik: kalau lambat, pindah.
   if (FKEY && FBASE) {
-    // Batas 9 detik pada percobaan pertama: kalau lambat, langsung pindah kunci.
     const pertama = await panggilSatu({ base: FBASE, key: FKEY, model: FMODEL, pesan, suhu, jsonMode: false, batasMs: 9000 });
     if (pertama.ok) return { ...pertama, sumber: "utama" };
-    if (KEY) {
-      const cadangan = await panggilSatu({ base: BASE, key: KEY, model: MODEL, pesan, suhu, jsonMode: true, batasMs: 25000 });
-      if (cadangan.ok) return { ...cadangan, sumber: "cadangan" };
-      return { ok: false, error: `${pertama.error} | kunci utama: ${cadangan.error}` };
-    }
-    return pertama;
+    gagal.push(`bansos: ${pertama.error}`);
   }
-  if (KEY) {
-    const utama = await panggilSatu({ base: BASE, key: KEY, model: MODEL, pesan, suhu, jsonMode: true, batasMs: 30000 });
-    return utama.ok ? { ...utama, sumber: "utama" } : utama;
+  // 3) Kunci env utama.
+  if (ENV_KEY) {
+    const cadangan = await panggilSatu({ base: ENV_BASE, key: ENV_KEY, model: ENV_MODEL, pesan, suhu, jsonMode: true, batasMs: 25000 });
+    if (cadangan.ok) return { ...cadangan, sumber: "cadangan" };
+    gagal.push(`kunci env: ${cadangan.error}`);
   }
+  if (gagal.length > 0) return { ok: false, error: gagal.join(" | ") };
   return { ok: false, error: "llm_belum_dikonfigurasi" };
 }
 

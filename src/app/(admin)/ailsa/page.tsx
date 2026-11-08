@@ -14,7 +14,7 @@ type Data = {
 };
 type Status = {
   configured: boolean;
-  llm: { configured: boolean; model: string; kunci?: { utama: boolean; cadangan: boolean } };
+  llm: { configured: boolean; model: string; kunci?: { utama: boolean; cadangan: boolean; aplikasi?: boolean }; dariAplikasi?: boolean; masker?: string | null };
   env: Array<{ name: string; filled: boolean }>;
   admin_number: string | null;
   settings: Record<string, string | number | boolean> | null;
@@ -42,6 +42,25 @@ export default function AilsaPage() {
   const [analisa, setAnalisa] = useState<Array<Record<string, string | number | boolean>>>([
   ]);
 
+  const [kunci, setKunci] = useState<{ tersimpan: boolean; masker: string | null; model: string; base_url: string } | null>(null);
+  const [kunciForm, setKunciForm] = useState({ api_key: "", model: "deepseek-chat", base_url: "https://api.deepseek.com/v1" });
+
+  async function aksiKunci(aksi: "simpan" | "hapus" | "uji") {
+    setBusy(`kunci-${aksi}`);
+    setInfo(null);
+    const res = await fetch("/api/ailsa/kunci", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ aksi, ...kunciForm }),
+    });
+    const d = await res.json();
+    setBusy(null);
+    setInfo({ ok: Boolean(d.ok), text: d.ok ? (d.pesan || "Berhasil.") : (d.error || d.pesan || "Gagal.") });
+    if (d.ok && aksi !== "uji") {
+      setKunciForm((f) => ({ ...f, api_key: "" }));
+      load();
+    }
+  }
+
   const load = useCallback(() => {
     fetch("/api/ailsa")
       .then((r) => r.json())
@@ -58,6 +77,14 @@ export default function AilsaPage() {
     fetch("/api/ailsa/status")
       .then((r) => r.json())
       .then((d) => (d.ok ? setStatus(d) : null))
+      .catch(() => null);
+    fetch("/api/ailsa/kunci")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.ok) return;
+        setKunci(d);
+        setKunciForm((f) => ({ ...f, model: d.model || f.model, base_url: d.base_url || f.base_url }));
+      })
       .catch(() => null);
   }, []);
 
@@ -198,8 +225,7 @@ export default function AilsaPage() {
   if (error && !data) return (<><PageHead title="Ailsa" /><ErrorState message={error} /></>);
   if (!data) return (<><PageHead title="Ailsa" /><LoadingState /></>);
 
-  const siap = Boolean(status?.configured && status?.llm.configured);
-  const kosong = (status?.env || []).filter((e) => !e.filled);
+  const siap = Boolean(status?.llm.configured);
   const ambilAlihAktif = new Set(
     data.leads.filter((l) => Boolean(l.takeover_at)).map((l) => String(l.wa_number || ""))
   );
@@ -208,7 +234,7 @@ export default function AilsaPage() {
     <>
       <PageHead
         title="Ailsa"
-        subtitle="Asisten WhatsApp: menjawab hanya dari bank pengetahuan yang disetujui, mengumpulkan lead ke pipeline Admission."
+        subtitle="Asisten AI Balita Center dengan otak DeepSeek: menjawab hanya dari bank pengetahuan yang disetujui, mengumpulkan lead ke pipeline Admission."
       />
       {error ? <ErrorState message={error} /> : null}
       {info ? (
@@ -223,16 +249,18 @@ export default function AilsaPage() {
               <th style={{ width: 220 }}>Kanal WhatsApp</th>
               <td>
                 <StatusBadge status={status?.configured ? "aktif" : "nonaktif"} />{" "}
-                {status?.configured ? "Kredensial Meta terisi." : "Belum Dikonfigurasi — pesan hanya dicatat di log, tidak dikirim."}
+                {status?.configured ? "Kredensial Meta terisi, tetapi kanal tidak dipakai atas keputusan pemilik." : "Nonaktif atas keputusan pemilik — Ailsa berjalan di dalam aplikasi (Simulator), bukan lewat Meta."}
               </td>
             </tr>
             <tr>
               <th>Otak LLM</th>
               <td>
                 <StatusBadge status={status?.llm.configured ? "aktif" : "nonaktif"} />{" "}
-                {status?.llm.configured ? `Model: ${status.llm.model}` : "Belum Dikonfigurasi — isi AILSA_LLM_API_KEY dan LLM_MODEL."}
-                {status?.llm.kunci ? (
-                  <span className="muted"> · kunci utama {status.llm.kunci.utama ? "siap" : "kosong"}, cadangan {status.llm.kunci.cadangan ? "siap" : "kosong"}</span>
+                {status?.llm.configured ? `Model: ${status.llm.model}` : "Belum ada kunci — isi kunci DeepSeek di kartu Kunci LLM di bawah."}
+                {status?.llm.dariAplikasi ? (
+                  <span className="muted"> · kunci dari aplikasi ({status.llm.masker || "••••"})</span>
+                ) : status?.llm.kunci ? (
+                  <span className="muted"> · kunci env utama {status.llm.kunci.utama ? "siap" : "kosong"}, cadangan {status.llm.kunci.cadangan ? "siap" : "kosong"}</span>
                 ) : null}
               </td>
             </tr>
@@ -245,17 +273,55 @@ export default function AilsaPage() {
                 {status ? <span className="muted"> · total {status.outbound.total}, gagal {status.outbound.gagal}</span> : null}
               </td>
             </tr>
-            <tr>
-              <th>Template Meta</th>
-              <td>{status?.templates.join(", ") || "-"} <span className="muted">(status persetujuan harus dicek di Meta Business Suite)</span></td>
-            </tr>
           </tbody>
         </table>
         <p className={siap ? "muted" : "notice"} style={{ marginBottom: 0 }}>
           {siap
-            ? "Kanal dan otak sudah terisi. Status \"real\" hanya sah setelah Kirim Pesan Tes benar-benar tiba di WhatsApp."
-            : `Masih ada variabel yang kosong: ${kosong.map((e) => e.name).join(", ") || "(tidak ada)"}. Bot belum mengirim pesan sungguhan.`}
+            ? "Otak DeepSeek aktif — Ailsa bisa diajak bicara di Simulator dan dipakai membuat draf laporan serta analisa perkembangan (internal staf)."
+            : "Otak Ailsa belum menyala. Isi kunci DeepSeek di kartu Kunci LLM di bawah — tanpa Meta, tanpa mengubah file server."}
         </p>
+      </article>
+
+      <article className="card" style={{ marginTop: 12 }}>
+        <h2 style={{ marginTop: 0 }}>Kunci LLM — DeepSeek</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Otak Ailsa memakai DeepSeek, <strong>bukan Meta</strong>. Tempel kunci API DeepSeek
+          (dari platform.deepseek.com) di sini — langsung aktif tanpa restart dan tanpa mengubah
+          file server. Kunci tersimpan di database sekolah dan tidak pernah ditampilkan lagi
+          selain 4 karakter terakhirnya.
+        </p>
+        <p>
+          Status:{" "}
+          <StatusBadge status={kunci?.tersimpan ? "aktif" : "nonaktif"} />{" "}
+          {kunci?.tersimpan
+            ? <>Kunci dari aplikasi terpasang (<strong>{kunci.masker}</strong>), model <strong>{kunci.model}</strong>.</>
+            : "Belum ada kunci dari aplikasi. Ailsa memakai kunci env server bila ada."}
+        </p>
+        <div className="form-grid">
+          <div className="field"><label htmlFor="kc-key">Kunci API DeepSeek</label>
+            <input id="kc-key" type="password" autoComplete="off" placeholder={kunci?.tersimpan ? "Biarkan kosong untuk mempertahankan kunci lama" : "sk-…"}
+              value={kunciForm.api_key} onChange={(e) => setKunciForm({ ...kunciForm, api_key: e.target.value })} /></div>
+          <div className="field"><label htmlFor="kc-model">Model</label>
+            <select id="kc-model" value={kunciForm.model} onChange={(e) => setKunciForm({ ...kunciForm, model: e.target.value })}>
+              <option value="deepseek-chat">deepseek-chat (cepat, untuk chat & draf)</option>
+              <option value="deepseek-reasoner">deepseek-reasoner (penalaran lebih dalam)</option>
+            </select></div>
+          <div className="field"><label htmlFor="kc-base">Base URL</label>
+            <input id="kc-base" type="url" value={kunciForm.base_url} onChange={(e) => setKunciForm({ ...kunciForm, base_url: e.target.value })} /></div>
+        </div>
+        <div className="row" style={{ marginTop: 10 }}>
+          <button type="button" className="btn" disabled={busy?.startsWith("kunci")} onClick={() => void aksiKunci("simpan")}>
+            {busy === "kunci-simpan" ? "Menyimpan…" : "Simpan Kunci"}
+          </button>
+          <button type="button" className="btn secondary" disabled={busy?.startsWith("kunci")} onClick={() => void aksiKunci("uji")}>
+            {busy === "kunci-uji" ? "Menguji…" : "Uji Koneksi"}
+          </button>
+          {kunci?.tersimpan ? (
+            <button type="button" className="btn secondary" style={{ color: "#b42318", borderColor: "#f0c4bf" }} disabled={busy?.startsWith("kunci")} onClick={() => void aksiKunci("hapus")}>
+              Hapus Kunci
+            </button>
+          ) : null}
+        </div>
       </article>
 
       <article className="card" style={{ marginTop: 12 }}>

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { dbErrorMessage, query } from "@/lib/db";
 import { guard } from "@/lib/current-user";
 import { whatsappConfigured } from "@/lib/whatsapp";
-import { llmConfigured } from "@/lib/ailsa/llm";
+import { llmConfigured, segarkanKonfigurasi } from "@/lib/ailsa/llm";
 import { catatAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +13,7 @@ export async function GET() {
   const denied = await guard("messages.send");
   if (denied.error) return denied.error;
   try {
+    await segarkanKonfigurasi();
     const [percakapan, pengetahuan, takTerjawab, leads] = await Promise.all([
       query(
         `SELECT c.id, c.direction, c.sender, c.message_text, c.escalated, c.created_at,

@@ -1,6 +1,6 @@
 import { query } from "@/lib/db";
 import { catatAudit } from "@/lib/audit";
-import { panggilLLM, parseJsonLonggar } from "./llm";
+import { panggilLLM, parseJsonLonggar, llmModel } from "./llm";
 import { getChildDailyReports, getChildDevelopment, getStppaReference, ringkasLaporan } from "./tools";
 
 // Dua kemampuan tulis Ailsa untuk staf:
@@ -248,7 +248,7 @@ Aturan wajib:
      VALUES ($1::uuid,$2::date,$3::date,$4,$5::jsonb,$6,$7,$8::uuid) RETURNING id`,
     [
       opts.childId, opts.dari, opts.sampai, laporan.length, JSON.stringify(j),
-      process.env.LLM_MODEL || "deepseek-chat", Boolean(j.needs_teacher_review), opts.userId,
+      llmModel(), Boolean(j.needs_teacher_review), opts.userId,
     ]
   );
 

@@ -61,8 +61,11 @@ npm run start               # http://localhost:3000
 Mode pengembangan: `npm run dev`.
 
 Variabel lingkungan: lihat `.env.example`. Unggahan berkas tersimpan lokal di
-`UPLOAD_DIR` atau ke S3/R2 bila `S3_*` diisi. Kanal WhatsApp Ailsa aktif bila
-`AILSA_WHATSAPP_TOKEN`, `AILSA_PHONE_NUMBER_ID`, dan `AILSA_LLM_API_KEY` terisi.
+`UPLOAD_DIR` atau ke S3/R2 bila `S3_*` diisi. Otak Ailsa memakai **DeepSeek**:
+kuncinya bisa diisi admin langsung dari kartu **Kunci LLM** di halaman Ailsa
+(tersimpan di `bot_settings`, langsung aktif tanpa restart), atau lewat env
+`AILSA_LLM_API_KEY` sebagai cadangan. Kanal WhatsApp/Meta nonaktif atas
+keputusan pemilik — Ailsa berjalan di Simulator dalam aplikasi.
 
 ## Urutan pemakaian pertama (database kosong)
 
