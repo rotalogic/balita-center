@@ -50,7 +50,7 @@ export async function GET(request: Request) {
     const rows = await query<Record<string, unknown> & { cycle_start: string; cycle_end: string }>(
       `SELECT cr.*, c.full_name AS child_name, lc.theme AS cycle_theme,
               lc.start_date::text AS cycle_start, lc.end_date::text AS cycle_end,
-              s.full_name AS teacher_name, b.name AS branch_name,
+              s.full_name AS teacher_name, s.photo_url AS teacher_photo, s.signature_url AS teacher_ttd, b.name AS branch_name,
               (SELECT cl.name FROM enrollments e JOIN classes cl ON cl.id = e.class_id
                 WHERE e.child_id = c.id AND e.status = 'aktif'
                 ORDER BY e.start_date DESC NULLS LAST LIMIT 1) AS class_name

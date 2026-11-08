@@ -4,6 +4,10 @@ import PDFDocument from "pdfkit";
 // (app/tagihan/[id]/cetak) — nomor, pihak, rincian, total, cara bayar.
 // Dipakai sebagai lampiran email tagihan & pengingat ke wali.
 export type DataTagihan = {
+  sekolah_nama?: string;
+  sekolah_tagline?: string;
+  sekolah_alamat?: string | null;
+  sekolah_telepon?: string | null;
   invoice_number: string | null;
   status: string;
   description: string | null;
@@ -47,9 +51,9 @@ export function buatPdfTagihan(d: DataTagihan): PDFKit.PDFDocument {
   let y = 44;
 
   // Kepala: merek kiri, judul kanan, palang emas di bawahnya.
-  doc.fillColor(MARUN).font("Helvetica-Bold").fontSize(17).text("BALITA CENTER", kiri, y);
+  doc.fillColor(MARUN).font("Helvetica-Bold").fontSize(17).text((d.sekolah_nama || "Balita Center").toUpperCase(), kiri, y);
   doc.fillColor(ABU).font("Helvetica").fontSize(9)
-    .text(`Montessori & Childcare — Cabang ${d.branch_name}${d.branch_city ? ` (${d.branch_city})` : ""}`, kiri, y + 21, { width: 300 });
+    .text(`${d.sekolah_tagline || "Montessori & Childcare"} — Cabang ${d.branch_name}${d.branch_city ? ` (${d.branch_city})` : ""}${d.sekolah_alamat ? ` · ${d.sekolah_alamat}` : ""}${d.sekolah_telepon ? ` · ${d.sekolah_telepon}` : ""}`, kiri, y + 21, { width: 330 });
   doc.fillColor(TINTA).font("Helvetica-Bold").fontSize(15)
     .text("TAGIHAN SPP", kiri, y, { width: lebar, align: "right" });
   doc.fillColor(ABU).font("Helvetica").fontSize(9)
@@ -142,6 +146,12 @@ export async function pdfTagihanBuffer(invoiceId: string): Promise<{ buffer: Buf
   );
   if (!rows[0]) return null;
   const data = rows[0];
+  const { getIdentitas } = await import("../sekolah");
+  const identitas = await getIdentitas();
+  data.sekolah_nama = identitas.nama;
+  data.sekolah_tagline = identitas.tagline;
+  data.sekolah_alamat = identitas.alamat;
+  data.sekolah_telepon = identitas.telepon;
   const doc = buatPdfTagihan(data);
   const chunks: Buffer[] = [];
   const selesai = new Promise<Buffer>((resolve) => {

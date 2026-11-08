@@ -21,6 +21,7 @@ type Data = {
   // Ilustrasi sampul resmi (public/ilustrasi/sampul-laporan.jpg) — digambar
   // sebagai pita gambar sesudah kepala laporan, sama seperti versi web.
   banner?: Buffer | null;
+  ttd?: Buffer | null; // tanda tangan digital fasilitator utama
 };
 
 const AREA: Record<string, string> = {
@@ -336,7 +337,13 @@ export function buatPdfLaporan(d: Data): PDFKit.PDFDocument {
   doc.circle(kiri + 13, y + 20, 13).fill("#e8ebee");
   doc.restore();
   doc.fillColor("#5b656f").font("Helvetica-Bold").fontSize(10).text(pelapor.charAt(0).toUpperCase(), kiri, y + 15.5, { width: 26, align: "center" });
-  doc.font("Helvetica").fontSize(9).text(`Dilaporkan oleh: ${pelapor}`, kiri + 34, y + 16, { width: lebar - 34 });
+  doc.font("Helvetica").fontSize(9).text(`Dilaporkan oleh: ${pelapor}`, kiri + 34, y + 16, { width: lebar - 200 });
+  if (d.ttd) {
+    try {
+      doc.image(d.ttd, kiri + lebar - 118, y + 0, { fit: [110, 30], align: "right" });
+      doc.fontSize(7).fillColor("#98a2ad").text("Tanda tangan digital guru", kiri + lebar - 118, y + 31, { width: 110, align: "right" });
+    } catch { /* tanda tangan gagal dimuat — dokumen tetap terbit */ }
+  }
   doc.fontSize(7.5).fillColor("#98a2ad").text(
     `Dokumen ini dibuat otomatis oleh aplikasi Balita Center dari laporan yang telah diterbitkan${d.published_at ? ` pada ${tgl(d.published_at)}` : ""}.`,
     kiri, y + 34, { width: lebar }

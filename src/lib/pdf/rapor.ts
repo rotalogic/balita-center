@@ -12,6 +12,8 @@ type Data = {
   narratives: Record<string, string | null>;
   agregat: AgregatRapor;
   photos?: Array<Buffer | null>; // sejajar agregat.foto
+  sekolah_kop?: string; // baris kop dari identitas sekolah, mis. "BALITA CENTER — MONTESSORI & CHILDCARE"
+  ttd?: Buffer | null; // tanda tangan digital guru pembuat rapor
   banner?: Buffer | null; // ilustrasi sampul rapor (public/ilustrasi/sampul-rapor.jpg)
   ilustrasi?: Buffer | null; // pengisi Dokumentasi bila belum ada foto (sampul-laporan.jpg)
 };
@@ -95,7 +97,7 @@ export function buatPdfRapor(d: Data): PDFKit.PDFDocument {
   };
 
   // ---------- Kepala ----------
-  doc.font("Helvetica-Bold").fontSize(9).fillColor(ABU).text("BALITA CENTER — MONTESSORI & CHILDCARE", kiri, y, { width: lebar, characterSpacing: 1 });
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(ABU).text((d.sekolah_kop || "BALITA CENTER — MONTESSORI & CHILDCARE").toUpperCase(), kiri, y, { width: lebar, characterSpacing: 1 });
   y += 14;
   doc.font("Helvetica-Bold").fontSize(19).fillColor(GELAP).text("Rapor Perkembangan", kiri, y, { width: lebar });
   y += 24;
@@ -241,7 +243,13 @@ export function buatPdfRapor(d: Data): PDFKit.PDFDocument {
   const guru = d.teacher || "Guru kelas";
   doc.moveTo(kiri, y).lineTo(kiri + lebar, y).lineWidth(0.7).strokeColor("#edf0f3").stroke();
   y += 9;
-  doc.font("Helvetica").fontSize(9.5).fillColor("#5b656f").text(`Dilaporkan oleh: ${guru}`, kiri, y, { width: lebar });
+  doc.font("Helvetica").fontSize(9.5).fillColor("#5b656f").text(`Dilaporkan oleh: ${guru}`, kiri, y, { width: lebar - 170 });
+  if (d.ttd) {
+    try {
+      doc.image(d.ttd, kiri + lebar - 118, y - 6, { fit: [110, 30], align: "right" });
+      doc.fontSize(7).fillColor(ABU).text("Tanda tangan digital guru", kiri + lebar - 118, y + 25, { width: 110, align: "right" });
+    } catch { /* tanda tangan gagal dimuat — dokumen tetap terbit */ }
+  }
   y += 14;
   doc.fontSize(8).fillColor(ABU).text("Dokumen dibuat otomatis dari data Balita Center. Rapor disusun dan disetujui oleh guru kelas; analisa internal tidak termasuk dalam dokumen ini.", kiri, y, { width: lebar });
 

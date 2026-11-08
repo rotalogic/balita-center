@@ -3,6 +3,7 @@ import path from "node:path";
 import { query } from "@/lib/db";
 import { currentUser, hasPermission } from "@/lib/current-user";
 import { buatPdfRapor } from "@/lib/pdf/rapor";
+import { getIdentitas, kopLengkap } from "@/lib/sekolah";
 import { KOLOM_NARASI, agregatRapor } from "@/lib/rapor";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
   const rows = await query<Record<string, string | null> & { child_id: string; cycle_start: string; cycle_end: string }>(
     `SELECT cr.*, c.full_name AS child_name, b.name AS branch_name,
             lc.theme AS cycle_theme, lc.start_date::text AS cycle_start, lc.end_date::text AS cycle_end,
-            s.full_name AS teacher_name,
+            s.full_name AS teacher_name, s.signature_url AS teacher_ttd,
             (SELECT cl.name FROM enrollments e JOIN classes cl ON cl.id = e.class_id
               WHERE e.child_id = c.id AND e.status = 'aktif'
               ORDER BY e.start_date DESC NULLS LAST LIMIT 1) AS class_name
@@ -70,6 +71,17 @@ export async function GET(request: Request, { params }: { params: { id: string }
   for (const k of KOLOM_NARASI) narratives[k] = r[k] ? String(r[k]) : null;
 
   const banner = await readFile(path.join(process.cwd(), "public/ilustrasi/sampul-rapor.jpg")).catch(() => null);
+  const ttd = await (async () => {
+    const url = (r as Record<string, unknown>).teacher_ttd as string | null;
+    if (!url) return null;
+    try {
+      const asal = new URL(request.url).origin;
+      const lokal = !url.startsWith("http");
+      const respon = await fetch(lokal ? `${asal}${url}` : url, lokal ? { headers: { cookie: request.headers.get("cookie") || "" } } : undefined);
+      if (!respon.ok) return null;
+      return Buffer.from(await respon.arrayBuffer());
+    } catch { return null; }
+  })();
   const ilustrasi = await readFile(path.join(process.cwd(), "public/ilustrasi/sampul-laporan.jpg")).catch(() => null);
   const doc = buatPdfRapor({
     child_name: String(r.child_name),
@@ -83,8 +95,10 @@ export async function GET(request: Request, { params }: { params: { id: string }
     narratives,
     agregat,
     photos: fotoBuffers,
+    sekolah_kop: kopLengkap(await getIdentitas()),
     banner,
     ilustrasi,
+    ttd,
   });
 
   const potongan: Buffer[] = [];

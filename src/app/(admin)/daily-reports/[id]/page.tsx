@@ -28,6 +28,8 @@ type Report = {
   home_suggestion: string | null;
   child_name: string;
   class_name: string;
+  teacher_photo: string | null;
+  teacher_ttd: string | null;
   teacher_name: string;
   facilitator_name: string | null;
 };
@@ -168,6 +170,8 @@ export default function DailyReportDetailPage({ params }: { params: { id: string
           activities={activities}
           childName={report.child_name}
           reporterName={report.teacher_name}
+          reporterPhoto={report.teacher_photo}
+          reporterTtd={report.teacher_ttd}
           pdfUrl={report.status === "published" ? `/api/dokumen/laporan/${report.id}/pdf` : null}
         />
       </div>

@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { query } from "@/lib/db";
+import { getIdentitas } from "@/lib/sekolah";
 import { currentUser, hasPermission } from "@/lib/current-user";
 import { tanggalPanjang } from "@/lib/format";
 import { terbilang } from "@/lib/terbilang";
@@ -44,6 +45,7 @@ export default async function CetakKwitansi({ params }: { params: { id: string }
     [params.id]
   );
   const k = rows[0];
+  const identitas = await getIdentitas();
   if (!k) notFound();
 
   // Staf berhak, atau wali anak itu sendiri.
@@ -71,8 +73,8 @@ export default async function CetakKwitansi({ params }: { params: { id: string }
       <div className="lembar cap">
         <div className="baris">
           <div>
-            <div className="merek">BALITA CENTER</div>
-            <div className="cabang">Montessori &amp; Childcare — Cabang {k.branch_name}</div>
+            <div className="merek">{identitas.nama.toUpperCase()}</div>
+            <div className="cabang">{identitas.tagline} — Cabang {k.branch_name}</div>
           </div>
           <div style={{ textAlign: "right" }}>
             <div className="judul">KWITANSI PEMBAYARAN</div>
@@ -108,7 +110,7 @@ export default async function CetakKwitansi({ params }: { params: { id: string }
         <div className="tanda">
           <div>
             <div className="sub">Petugas penerima,</div>
-            <div className="nama">{k.petugas || "Admin Balita Center"}</div>
+            <div className="nama">{k.petugas || `Admin ${identitas.nama}`}</div>
           </div>
           <div>
             <div className="sub">Wali,</div>

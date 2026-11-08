@@ -90,6 +90,8 @@ export default function AkunPage() {
           )}
         </section>
 
+        <ProfilGuru />
+
         <section style={card}>
           <strong>Autentikasi Dua Faktor (2FA)</strong>
           <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
@@ -165,5 +167,85 @@ export default function AkunPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+type StafProfil = { id: string; full_name: string; position: string | null; photo_url: string | null; signature_url: string | null };
+
+function ProfilGuru() {
+  const [staf, setStaf] = useState<StafProfil | null | undefined>(undefined);
+  const [sibuk, setSibuk] = useState("");
+  const [info, setInfo] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/akun/profil")
+      .then((r) => r.json())
+      .then((d) => setStaf(d.ok ? d.staf : null))
+      .catch(() => setStaf(null));
+  }, []);
+
+  async function unggah(jenis: "foto" | "ttd", file: File | null) {
+    if (!file) return;
+    setSibuk(jenis);
+    setInfo(null);
+    const fd = new FormData();
+    fd.append("jenis", jenis);
+    fd.append("file", file);
+    const r = await fetch("/api/akun/profil", { method: "POST", body: fd });
+    const d = await r.json();
+    setSibuk("");
+    if (d.ok) {
+      setStaf((s) => (s ? { ...s, [jenis === "foto" ? "photo_url" : "signature_url"]: d.url } : s));
+      setInfo(jenis === "foto" ? "Foto profil tersimpan." : "Tanda tangan tersimpan — akan tampil di laporan & rapor berikutnya.");
+    } else setInfo(d.error || "Gagal mengunggah.");
+  }
+
+  if (staf === undefined) return (<section style={card}><strong>Profil Guru</strong><span style={{ color: "var(--muted)", fontSize: 14 }}>Memuat…</span></section>);
+  if (!staf) return (
+    <section style={card}>
+      <strong>Profil Guru</strong>
+      <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
+        Akun Anda belum terhubung ke data staf, jadi foto profil dan tanda tangan digital belum tersedia.
+        Minta admin menghubungkan akun ini ke profil guru Anda.
+      </p>
+    </section>
+  );
+
+  return (
+    <section style={card}>
+      <strong>Profil Guru — {staf.full_name}{staf.position ? ` · ${staf.position}` : ""}</strong>
+      <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
+        <div style={{ display: "grid", gap: 8, justifyItems: "start" }}>
+          {staf.photo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={staf.photo_url} alt="Foto profil" style={{ width: 92, height: 92, borderRadius: "50%", objectFit: "cover", border: "1px solid var(--line)" }} />
+          ) : (
+            <span style={{ width: 92, height: 92, borderRadius: "50%", background: "var(--cream)", border: "1px solid var(--line)", display: "grid", placeItems: "center", fontSize: 30, color: "var(--muted)" }}>{staf.full_name.charAt(0)}</span>
+          )}
+          <label className="btn small secondary" style={{ cursor: "pointer" }}>
+            {sibuk === "foto" ? "Mengunggah…" : "Unggah Foto Profil"}
+            <input type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => void unggah("foto", e.target.files?.[0] || null)} />
+          </label>
+          <span style={{ fontSize: 12, color: "var(--muted)" }}>JPG/PNG/WEBP, maks 5 MB.</span>
+        </div>
+        <div style={{ display: "grid", gap: 8, justifyItems: "start" }}>
+          {staf.signature_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={staf.signature_url} alt="Tanda tangan digital" style={{ height: 92, maxWidth: 230, objectFit: "contain", background: "#fff", border: "1px solid var(--line)", borderRadius: 8, padding: 6 }} />
+          ) : (
+            <span style={{ height: 92, width: 230, background: "#fff", border: "1px dashed var(--line)", borderRadius: 8, display: "grid", placeItems: "center", fontSize: 12, color: "var(--muted)", textAlign: "center", padding: 8 }}>Belum ada tanda tangan</span>
+          )}
+          <label className="btn small secondary" style={{ cursor: "pointer" }}>
+            {sibuk === "ttd" ? "Mengunggah…" : "Unggah Tanda Tangan"}
+            <input type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => void unggah("ttd", e.target.files?.[0] || null)} />
+          </label>
+          <span style={{ fontSize: 12, color: "var(--muted)", maxWidth: 300 }}>
+            Foto tanda tangan di kertas putih atau PNG latar transparan, maks 2 MB.
+            Tanda tangan ini tampil otomatis di kaki laporan harian dan rapor yang Anda terbitkan.
+          </span>
+        </div>
+      </div>
+      {info ? <p style={{ fontSize: 13, margin: 0 }}>{info}</p> : null}
+    </section>
   );
 }

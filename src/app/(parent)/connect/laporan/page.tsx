@@ -29,6 +29,8 @@ export default function ConnectLaporanPage() {
       activities={activities}
       childName={String(data.child.full_name)}
       reporterName={reporter}
+      reporterPhoto={(r.teacher_photo as string) || null}
+      reporterTtd={(r.teacher_ttd as string) || null}
       pdfUrl={`/api/dokumen/laporan/${String(r.id)}/pdf`}
     />
   );

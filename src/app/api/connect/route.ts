@@ -62,7 +62,7 @@ export async function GET(request: Request) {
     const [child, report, activities, health, development, events, messages, photos, invoices] = await Promise.all([
       query("SELECT * FROM children WHERE id = $1", [childId]),
       query(
-        `SELECT r.*, lf.full_name AS facilitator_name, s.full_name AS teacher_name
+        `SELECT r.*, lf.full_name AS facilitator_name, s.full_name AS teacher_name, s.photo_url AS teacher_photo, s.signature_url AS teacher_ttd
            FROM daily_reports r
            LEFT JOIN staff lf ON lf.id = r.lead_facilitator_id
            LEFT JOIN staff s ON s.id = r.created_by

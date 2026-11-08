@@ -59,6 +59,8 @@ function GayaRapor() {
       .rap-panel .kaki { font-size: 12px; color: #8a94a0; margin-top: 8px; line-height: 1.5; }
       .rap-kaki { margin-top: 30px; padding-top: 14px; border-top: 1px solid #edf0f3; color: #5b656f; font-size: 13.5px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
       .rap-ava { width: 34px; height: 34px; border-radius: 50%; background: #e8ebee; color: #5b656f; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex: none; }
+      .rap-ttd { height: 40px; max-width: 130px; object-fit: contain; margin-left: auto; }
+      .rap-ava-img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex: none; }
     `}</style>
   );
 }
@@ -190,9 +192,18 @@ export function RaporWeb({
       </section>
 
       <footer className="rap-kaki">
-        <span className="rap-ava">{guru.charAt(0).toUpperCase()}</span>
+        {(report as Record<string, unknown>).teacher_photo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="rap-ava-img" src={String((report as Record<string, unknown>).teacher_photo)} alt={guru} />
+        ) : (
+          <span className="rap-ava">{guru.charAt(0).toUpperCase()}</span>
+        )}
         <span>Dilaporkan oleh: {guru}</span>
-        {pdfUrl ? <span style={{ marginLeft: "auto" }}><a className="rap-pil" href={pdfUrl}>⭳ PDF</a></span> : null}
+        {(report as Record<string, unknown>).teacher_ttd ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="rap-ttd" src={String((report as Record<string, unknown>).teacher_ttd)} alt="Tanda tangan guru" />
+        ) : null}
+        {pdfUrl ? <span style={((report as Record<string, unknown>).teacher_ttd ? {} : { marginLeft: "auto" }) as React.CSSProperties}><a className="rap-pil" href={pdfUrl}>⭳ PDF</a></span> : null}
       </footer>
     </div>
   );

@@ -18,7 +18,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
             r.circle_theme, r.circle_rating, r.circle_notes, r.special_moment, r.home_suggestion,
             to_char(r.published_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') AS published_at,
             c.id AS child_id, c.full_name AS child_name, cl.name AS class_name, b.name AS branch_name,
-            s.full_name AS teacher
+            s.full_name AS teacher, s.signature_url AS teacher_ttd
        FROM daily_reports r
        JOIN children c ON c.id = r.child_id
        JOIN branches b ON b.id = r.branch_id
@@ -73,6 +73,16 @@ export async function GET(request: Request, { params }: { params: { id: string }
   );
 
   const banner = await readFile(path.join(process.cwd(), "public/ilustrasi/sampul-laporan.jpg")).catch(() => null);
+  const ttd = await (async () => {
+    const url = (r as Record<string, unknown>).teacher_ttd as string | null;
+    if (!url) return null;
+    try {
+      const lokal = !url.startsWith("http");
+      const respon = await fetch(lokal ? `${asal}${url}` : url, lokal ? { headers: { cookie: request.headers.get("cookie") || "" } } : undefined);
+      if (!respon.ok) return null;
+      return Buffer.from(await respon.arrayBuffer());
+    } catch { return null; }
+  })();
   const doc = buatPdfLaporan({
     child_name: String(r.child_name),
     class_name: r.class_name ? String(r.class_name) : null,
@@ -108,6 +118,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     })),
     photos: fotoBuffers,
     banner,
+    ttd,
   });
 
   const potongan: Buffer[] = [];

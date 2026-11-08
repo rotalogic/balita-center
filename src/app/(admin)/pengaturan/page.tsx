@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { PageHead, StatusBadge } from "@/components/chrome";
 import { ApiError, DataSection, KpiGrid, dateFmt, useApi, type AnyRow } from "@/components/module-ui";
 
@@ -16,6 +17,8 @@ export default function PengaturanPage() {
     <>
       <PageHead title="Pengaturan" subtitle="Pengguna, peran & izin RBAC, cabang, dan jejak audit" action={<Link className="btn secondary" href="/login">Buka Layar Login</Link>} />
       <ApiError error={error} />
+      <KartuIdentitas />
+      <KartuStatus />
       <KpiGrid items={[
         { label: "Pengguna", value: counts.data ? counts.data.counts.users : "...", icon: "☺", tone: "tone-sky" },
         { label: "Peran RBAC", value: counts.data ? counts.data.counts.roles : "...", icon: "⚑", tone: "tone-sage" },
@@ -67,5 +70,119 @@ export default function PengaturanPage() {
       </article>
       <p className="success">Login kata sandi aktif (scrypt), sesi cookie httpOnly, RBAC ditegakkan di server pada setiap API, dan pendaftaran baru menunggu persetujuan Super Admin. Kata sandi bisa direset lewat tautan sekali pakai dari menu Pengguna, serta 2FA TOTP tersedia di halaman Akun.</p>
     </>
+  );
+}
+
+type Identitas = { nama: string; tagline: string; alamat: string | null; telepon: string | null; email: string | null; logo_url: string | null };
+type BarisStatus = { kunci: string; label: string; ok: boolean; keterangan: string };
+
+function KartuIdentitas() {
+  const [form, setForm] = useState<Identitas | null>(null);
+  const [sibuk, setSibuk] = useState("");
+  const [info, setInfo] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/pengaturan")
+      .then((r) => r.json())
+      .then((d) => (d.ok ? setForm(d.identitas) : null))
+      .catch(() => null);
+  }, []);
+
+  async function simpan() {
+    if (!form) return;
+    setSibuk("simpan");
+    setInfo(null);
+    const r = await fetch("/api/pengaturan", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form),
+    });
+    const d = await r.json();
+    setSibuk("");
+    setInfo(d.ok ? { ok: true, text: d.pesan || "Tersimpan." } : { ok: false, text: d.error || "Gagal menyimpan." });
+  }
+
+  async function unggahLogo(file: File | null) {
+    if (!file) return;
+    setSibuk("logo");
+    setInfo(null);
+    const fd = new FormData();
+    fd.append("file", file);
+    const r = await fetch("/api/pengaturan/logo", { method: "POST", body: fd });
+    const d = await r.json();
+    setSibuk("");
+    if (d.ok) {
+      setForm((f) => (f ? { ...f, logo_url: d.url } : f));
+      setInfo({ ok: true, text: "Logo tersimpan." });
+    } else setInfo({ ok: false, text: d.error || "Gagal mengunggah logo." });
+  }
+
+  if (!form) return (<article className="card"><h2 style={{ marginTop: 0 }}>Identitas Sekolah</h2><p className="muted">Memuat…</p></article>);
+  const set = (k: keyof Identitas) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm({ ...form, [k]: e.target.value });
+
+  return (
+    <article className="card">
+      <h2 style={{ marginTop: 0 }}>Identitas Sekolah</h2>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Nama, tagline, dan kontak ini tampil di kop dokumen resmi — rapor, tagihan SPP, dan kwitansi —
+        menggantikan teks bawaan. Perubahan berlaku untuk dokumen yang dibuat sesudahnya.
+      </p>
+      <div className="form-grid">
+        <div className="field"><label htmlFor="id-nama">Nama Sekolah *</label>
+          <input id="id-nama" value={form.nama} onChange={set("nama")} /></div>
+        <div className="field"><label htmlFor="id-tagline">Tagline</label>
+          <input id="id-tagline" value={form.tagline} onChange={set("tagline")} /></div>
+        <div className="field"><label htmlFor="id-telepon">Telepon / WhatsApp</label>
+          <input id="id-telepon" value={form.telepon || ""} onChange={set("telepon")} placeholder="mis. 0812-3456-7890" /></div>
+        <div className="field"><label htmlFor="id-email">Email Resmi</label>
+          <input id="id-email" value={form.email || ""} onChange={set("email")} placeholder="halo@sekolah.sch.id" /></div>
+        <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="id-alamat">Alamat</label>
+          <input id="id-alamat" value={form.alamat || ""} onChange={set("alamat")} placeholder="Jalan, nomor, kota" /></div>
+      </div>
+      <div className="row" style={{ alignItems: "center", gap: 14, marginTop: 10 }}>
+        {form.logo_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={form.logo_url} alt="Logo sekolah" style={{ height: 54, maxWidth: 180, objectFit: "contain", background: "#faf7f2", borderRadius: 8, padding: 6 }} />
+        ) : (<span className="muted">Belum ada logo.</span>)}
+        <label className="btn secondary" style={{ cursor: "pointer" }}>
+          {sibuk === "logo" ? "Mengunggah…" : "Unggah Logo"}
+          <input type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => void unggahLogo(e.target.files?.[0] || null)} />
+        </label>
+        <button type="button" className="btn" disabled={sibuk === "simpan"} onClick={() => void simpan()}>{sibuk === "simpan" ? "Menyimpan…" : "Simpan Identitas"}</button>
+      </div>
+      {info ? <p className={info.ok ? "notice ok" : "notice"} role="status" style={{ marginTop: 10 }}>{info.text}</p> : null}
+    </article>
+  );
+}
+
+function KartuStatus() {
+  const [baris, setBaris] = useState<BarisStatus[] | null>(null);
+  useEffect(() => {
+    fetch("/api/pengaturan")
+      .then((r) => r.json())
+      .then((d) => (d.ok ? setBaris(d.status) : null))
+      .catch(() => null);
+  }, []);
+  return (
+    <article className="card">
+      <h2 style={{ marginTop: 0 }}>Status Konfigurasi</h2>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Keadaan sambungan dan kunci yang menentukan fitur berjalan atau menunggu — nilai kunci tidak pernah ditampilkan.
+      </p>
+      {!baris ? <p className="muted">Memuat…</p> : (
+        <div className="table-wrap">
+          <table>
+            <tbody>
+              {baris.map((b) => (
+                <tr key={b.kunci}>
+                  <td style={{ width: 230 }}><strong>{b.label}</strong></td>
+                  <td style={{ width: 110 }}><span className={b.ok ? "badge ok" : "badge warn"}>{b.ok ? "Siap" : "Perlu perhatian"}</span></td>
+                  <td className="muted">{b.keterangan}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </article>
   );
 }

@@ -193,6 +193,8 @@ function GayaLaporan() {
       .lap-saran { background: #fdeef1; border: 1px solid #f7d2da; border-radius: 16px; padding: 18px 20px; margin-top: 12px; color: #8e2247; }
       .lap-kaki { display: flex; align-items: center; gap: 11px; margin-top: 28px; padding-top: 16px; border-top: 1px solid #edf0f3; flex-wrap: wrap; }
       .lap-ava { width: 34px; height: 34px; border-radius: 50%; background: #e8ebee; color: #5b656f; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex: none; }
+      .lap-ava-img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex: none; }
+      .lap-ttd { height: 40px; max-width: 130px; object-fit: contain; margin-left: auto; }
       .lap-kaki .oleh { color: #5b656f; font-size: 13.5px; margin-right: auto; }
     `}</style>
   );
@@ -203,12 +205,16 @@ export function LaporanWeb({
   activities,
   childName,
   reporterName,
+  reporterPhoto,
+  reporterTtd,
   pdfUrl,
 }: {
   report: LaporanData;
   activities: LaporanAktivitas[];
   childName: string;
   reporterName?: string | null;
+  reporterPhoto?: string | null;
+  reporterTtd?: string | null;
   pdfUrl?: string | null;
 }) {
   const moodLabel = labelMood(report.mood);
@@ -331,8 +337,17 @@ export function LaporanWeb({
       ) : null}
 
       <footer className="lap-kaki">
-        <span className="lap-ava">{(reporterName || childName || "G").trim().charAt(0).toUpperCase()}</span>
+        {reporterPhoto ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="lap-ava-img" src={reporterPhoto} alt={reporterName || "Guru"} />
+        ) : (
+          <span className="lap-ava">{(reporterName || childName || "G").trim().charAt(0).toUpperCase()}</span>
+        )}
         <span className="oleh">Dilaporkan oleh: {reporterName || "Guru kelas"}</span>
+        {reporterTtd ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="lap-ttd" src={reporterTtd} alt="Tanda tangan guru" />
+        ) : null}
         {pdfUrl ? (
           <a className="lap-pil" href={pdfUrl}><Ikon d={JALUR.unduh} size={15} warna="#15608a" /> PDF</a>
         ) : null}

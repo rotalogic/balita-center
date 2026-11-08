@@ -38,6 +38,7 @@ psql "$DATABASE_URL" -f database/migrasi-media.sql
 psql "$DATABASE_URL" -f database/migrasi-ailsa-kunci.sql
 psql "$DATABASE_URL" -f database/migrasi-ailsa-channel.sql
 psql "$DATABASE_URL" -f database/migrasi-gateway.sql
+psql "$DATABASE_URL" -f database/migrasi-identitas.sql
 ```
 
 Semua migrasi memakai `IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`,
