@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { query } from "@/lib/db";
 import { currentUser, hasPermission } from "@/lib/current-user";
 import { buatPdfRapor } from "@/lib/pdf/rapor";
@@ -67,6 +69,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
   const narratives: Record<string, string | null> = {};
   for (const k of KOLOM_NARASI) narratives[k] = r[k] ? String(r[k]) : null;
 
+  const banner = await readFile(path.join(process.cwd(), "public/ilustrasi/sampul-rapor.jpg")).catch(() => null);
+  const ilustrasi = await readFile(path.join(process.cwd(), "public/ilustrasi/sampul-laporan.jpg")).catch(() => null);
   const doc = buatPdfRapor({
     child_name: String(r.child_name),
     class_name: r.class_name ? String(r.class_name) : null,
@@ -79,6 +83,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
     narratives,
     agregat,
     photos: fotoBuffers,
+    banner,
+    ilustrasi,
   });
 
   const potongan: Buffer[] = [];

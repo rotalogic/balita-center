@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { EmptyState, ErrorState, LoadingState, PageHead, StatusBadge } from "@/components/chrome";
 import { tanggalPanjang } from "@/lib/format";
 import { labelGizi } from "@/lib/rapor-data";
@@ -36,6 +36,7 @@ const ASPECTS: Array<[string, string]> = [
 
 export default function DetailAnakPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<(typeof TABS)[number]>("Profil Anak");
@@ -113,6 +114,18 @@ export default function DetailAnakPage() {
     const d = await res.json();
     if (d.ok) muat();
     else setDevError(d.error || "Gagal menghapus catatan.");
+  }
+
+  async function pindahKeSampah() {
+    const nama = String(data?.child.full_name || "anak ini");
+    const alasan = window.prompt(`Pindahkan ${nama} ke Sampah?\n\nData tidak dihapus permanen: anak hilang dari daftar, tagihan otomatis berhenti, dan Super Admin dapat memulihkannya dari menu Sampah di Data Anak Didik.\n\nAlasan (opsional):`, "");
+    if (alasan === null) return;
+    const r = await fetch(`/api/children/${params.id}/sampah`, {
+      method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason: alasan }),
+    });
+    const d = await r.json();
+    if (!d.ok) { window.alert(d.error || "Gagal memindahkan ke sampah."); return; }
+    router.push("/anak");
   }
 
   if (error) return (<><PageHead title="Detail Anak Didik" /><ErrorState message={error} /></>);
@@ -403,6 +416,15 @@ export default function DetailAnakPage() {
         </article>
         </>
       ) : null}
+
+      <article className="card" style={{ marginTop: 12, borderColor: "#f0d4da" }}>
+        <h2 style={{ marginTop: 0, color: "#9d2c4a" }}>Arsip Anak</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Memindahkan anak ke Sampah menyembunyikannya dari daftar dan menghentikan tagihan otomatis, tanpa menghapus data.
+          Super Admin dapat memulihkannya kapan pun dari tombol <strong>Sampah</strong> di halaman Data Anak Didik. Tindakan ini tercatat di Jejak Audit.
+        </p>
+        <button type="button" className="btn danger" onClick={() => void pindahKeSampah()}>🗑 Pindahkan ke Sampah</button>
+      </article>
     </>
   );
 }

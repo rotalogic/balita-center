@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { query } from "@/lib/db";
 import { currentUser, hasPermission } from "@/lib/current-user";
 import { buatPdfLaporan } from "@/lib/pdf/laporan";
@@ -70,6 +72,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
     })
   );
 
+  const banner = await readFile(path.join(process.cwd(), "public/ilustrasi/sampul-laporan.jpg")).catch(() => null);
   const doc = buatPdfLaporan({
     child_name: String(r.child_name),
     class_name: r.class_name ? String(r.class_name) : null,
@@ -104,6 +107,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
       work_mode: a.work_mode,
     })),
     photos: fotoBuffers,
+    banner,
   });
 
   const potongan: Buffer[] = [];

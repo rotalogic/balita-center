@@ -26,6 +26,33 @@ export default function KeuanganPage() {
   const [busy, setBusy] = useState(false);
   const [anak, setAnak] = useState<Child[]>([]);
   const [satu, setSatu] = useState({ child_id: "", period: nextMonth(), amount: "", reason: "" });
+  const [gw, setGw] = useState<{ tersimpan: boolean; server_mask: string | null; client_key: string | null; sandbox: boolean; aktif: boolean; siap: boolean } | null>(null);
+  const [gwForm, setGwForm] = useState({ server_key: "", client_key: "", sandbox: true, aktif: false });
+  const [gwBusy, setGwBusy] = useState("");
+  const [gwInfo, setGwInfo] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function muatGateway() {
+    const r = await fetch("/api/keuangan/gateway");
+    const d = await r.json();
+    if (d.ok) {
+      setGw(d);
+      setGwForm({ server_key: "", client_key: d.client_key || "", sandbox: d.sandbox, aktif: d.aktif });
+    }
+  }
+
+  async function aksiGateway(aksi: "simpan" | "uji") {
+    setGwBusy(aksi);
+    setGwInfo(null);
+    const r = await fetch("/api/keuangan/gateway", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ aksi, ...gwForm }),
+    });
+    const d = await r.json();
+    setGwBusy("");
+    if (!d.ok) { setGwInfo({ ok: false, text: d.error || "Gagal." }); return; }
+    setGwInfo({ ok: true, text: d.pesan || "Berhasil." });
+    if (aksi === "simpan") await muatGateway();
+  }
 
   useEffect(() => {
     fetch("/api/children")
@@ -33,6 +60,7 @@ export default function KeuanganPage() {
       .then((d) => (d.ok ? setAnak(d.children) : null))
       .catch(() => null);
   }, []);
+  useEffect(() => { void muatGateway(); }, []);
 
   useEffect(() => {
     fetch("/api/meta").then((r) => r.json()).then((d) => {
@@ -194,7 +222,48 @@ export default function KeuanganPage() {
           { key: "amount", label: "Nominal", render: (r) => rupiahFmt(Number(r.amount || 0)) },
         ]}
       />
-      <p className="notice">Payment gateway belum tersambung: pembayaran dicatat dan dikonfirmasi staf, lalu otomatis masuk Buku Kas dan mengubah status tagihan, termasuk yang tampil di Balita Connect orang tua.</p>
+      <div className="card" style={{ marginTop: 12 }}>
+        <h2 style={{ marginTop: 0 }}>Payment Gateway — Midtrans</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Bila aktif, orang tua dapat membayar tagihan langsung dari Balita Connect (transfer bank, e-wallet, kartu).
+          Status Lunas, Buku Kas, dan kwitansi berjalan otomatis dari notifikasi Midtrans. Pembayaran manual oleh staf tetap berjalan seperti biasa.
+          Kunci diambil dari dashboard Midtrans sekolah dan tersimpan di database — tidak lewat chat dan hanya tampil tersamar.
+        </p>
+        <p>
+          Status:{" "}
+          {gw?.siap ? <span className="badge ok">Aktif{gw.sandbox ? " · mode Sandbox (uji)" : " · mode Produksi"}</span>
+            : gw?.tersimpan ? <span className="badge warn">Kunci tersimpan, gateway belum diaktifkan</span>
+            : <span className="badge">Belum diatur</span>}
+          {gw?.server_mask ? <span className="muted"> · Server Key {gw.server_mask}</span> : null}
+        </p>
+        <div className="form-grid">
+          <div className="field"><label htmlFor="gw-server">Server Key Midtrans</label>
+            <input id="gw-server" type="password" autoComplete="off" placeholder={gw?.tersimpan ? "Sudah tersimpan — isi hanya untuk mengganti" : "SB-Mid-server-… / Mid-server-…"}
+              value={gwForm.server_key} onChange={(e) => setGwForm({ ...gwForm, server_key: e.target.value })} /></div>
+          <div className="field"><label htmlFor="gw-client">Client Key Midtrans</label>
+            <input id="gw-client" autoComplete="off" placeholder="SB-Mid-client-… / Mid-client-…"
+              value={gwForm.client_key} onChange={(e) => setGwForm({ ...gwForm, client_key: e.target.value })} /></div>
+          <div className="field"><label htmlFor="gw-mode">Mode</label>
+            <select id="gw-mode" value={gwForm.sandbox ? "sandbox" : "produksi"} onChange={(e) => setGwForm({ ...gwForm, sandbox: e.target.value === "sandbox" })}>
+              <option value="sandbox">Sandbox (uji coba)</option>
+              <option value="produksi">Produksi (uang sungguhan)</option>
+            </select></div>
+          <div className="field"><label htmlFor="gw-aktif">Aktifkan</label>
+            <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 400 }}>
+              <input id="gw-aktif" type="checkbox" checked={gwForm.aktif} onChange={(e) => setGwForm({ ...gwForm, aktif: e.target.checked })} />
+              Tampilkan tombol Bayar Sekarang di Balita Connect
+            </label></div>
+        </div>
+        {gwInfo ? <p className={gwInfo.ok ? "notice ok" : "notice"} role="status">{gwInfo.text}</p> : null}
+        <div className="row">
+          <button type="button" className="btn" disabled={Boolean(gwBusy)} onClick={() => void aksiGateway("simpan")}>{gwBusy === "simpan" ? "Menyimpan…" : "Simpan Setelan"}</button>
+          <button type="button" className="btn secondary" disabled={Boolean(gwBusy)} onClick={() => void aksiGateway("uji")}>{gwBusy === "uji" ? "Menguji…" : "Uji Server Key"}</button>
+        </div>
+        <p className="muted">
+          Di dashboard Midtrans, atur Payment Notification URL ke <code>{"/api/payments/webhook"}</code> pada domain aplikasi ini
+          (mis. https://balita.rotalogic.id/api/payments/webhook) supaya status lunas tercatat otomatis.
+        </p>
+      </div>
     </>
   );
 }

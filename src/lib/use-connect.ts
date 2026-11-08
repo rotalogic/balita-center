@@ -14,6 +14,7 @@ export type ConnectData = {
   invoices: Array<Record<string, string | number | null>>;
   preview?: boolean;
   guardian_name?: string | null;
+  gateway?: { aktif: boolean; client_key: string | null; sandbox: boolean };
 };
 
 const KUNCI = "bc-konteks-preview";

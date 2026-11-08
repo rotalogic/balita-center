@@ -12,6 +12,8 @@ type Data = {
   narratives: Record<string, string | null>;
   agregat: AgregatRapor;
   photos?: Array<Buffer | null>; // sejajar agregat.foto
+  banner?: Buffer | null; // ilustrasi sampul rapor (public/ilustrasi/sampul-rapor.jpg)
+  ilustrasi?: Buffer | null; // pengisi Dokumentasi bila belum ada foto (sampul-laporan.jpg)
 };
 
 const MARUN = "#7a1f3d";
@@ -114,6 +116,19 @@ export function buatPdfRapor(d: Data): PDFKit.PDFDocument {
   }
   y += hIdent + 20;
 
+  if (d.banner) {
+    try {
+      pastikan(120);
+      doc.save();
+      doc.roundedRect(kiri, y, lebar, 104, 10).clip();
+      doc.image(d.banner, kiri, y, { cover: [lebar, 104], align: "center", valign: "center" });
+      doc.restore();
+      y += 104 + 14;
+    } catch {
+      /* ilustrasi gagal dimuat — rapor tetap terbit tanpa gambar */
+    }
+  }
+
   // ---------- Narasi ----------
   const stppa = NARASI_STPPA.filter(([k]) => d.narratives[k]);
   if (stppa.length) {
@@ -137,6 +152,22 @@ export function buatPdfRapor(d: Data): PDFKit.PDFDocument {
       : asal?.caption || null;
     return { b, caption };
   }).filter((f) => f.b);
+  if (!foto.length && d.ilustrasi) {
+    judulSeksi("Dokumentasi Kegiatan");
+    try {
+      pastikan(150);
+      doc.save();
+      doc.roundedRect(kiri, y, lebar, 120, 8).clip();
+      doc.image(d.ilustrasi, kiri, y, { cover: [lebar, 120], align: "center", valign: "center" });
+      doc.restore();
+      y += 126;
+      doc.font("Helvetica").fontSize(8.5).fillColor(ABU)
+        .text("Ilustrasi — dokumentasi foto belum ditambahkan guru pada siklus ini.", kiri, y, { width: lebar });
+      y += 14;
+    } catch {
+      /* lewati */
+    }
+  }
   if (foto.length) {
     judulSeksi("Dokumentasi Kegiatan");
     const celah = 8;

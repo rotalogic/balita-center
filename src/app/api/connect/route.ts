@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbErrorMessage, query } from "@/lib/db";
 import { guard } from "@/lib/current-user";
+import { segarkanGateway } from "@/lib/gateway";
 
 export const dynamic = "force-dynamic";
 
@@ -125,6 +126,10 @@ export async function GET(request: Request) {
       messages,
       photos,
       invoices,
+      gateway: await (async () => {
+        const g = await segarkanGateway();
+        return { aktif: Boolean(g.aktif && g.server_key && g.client_key), client_key: g.client_key, sandbox: g.sandbox };
+      })(),
     });
   } catch (error) {
     return NextResponse.json({ ok: false, error: dbErrorMessage(error) }, { status: 503 });

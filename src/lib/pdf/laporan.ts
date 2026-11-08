@@ -18,6 +18,9 @@ type Data = {
   }>;
   // Foto aktivitas (buffer gambar) sejajar urutan activities; null bila tidak ada/gagal dimuat.
   photos?: Array<Buffer | null>;
+  // Ilustrasi sampul resmi (public/ilustrasi/sampul-laporan.jpg) — digambar
+  // sebagai pita gambar sesudah kepala laporan, sama seperti versi web.
+  banner?: Buffer | null;
 };
 
 const AREA: Record<string, string> = {
@@ -128,6 +131,19 @@ export function buatPdfLaporan(d: Data): PDFKit.PDFDocument {
   }
   doc.restore();
   y += 62 + 18;
+
+  // ---------- Ilustrasi sampul ----------
+  if (d.banner) {
+    try {
+      doc.save();
+      doc.roundedRect(kiri, y, lebar, 110, 12).clip();
+      doc.image(d.banner, kiri, y, { cover: [lebar, 110], align: "center", valign: "center" });
+      doc.restore();
+      y += 110 + 16;
+    } catch {
+      /* ilustrasi gagal dimuat — laporan tetap terbit tanpa gambar */
+    }
+  }
 
   // ---------- Aktivitas ----------
   doc.fillColor("#33383e").font("Helvetica-Bold").fontSize(11).text("AKTIVITAS & PEMBELAJARAN", kiri, y);

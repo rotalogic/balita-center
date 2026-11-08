@@ -13,7 +13,7 @@ export async function GET() {
   if (denied.error) return denied.error;
   try {
     const scope = branchScope(denied.user);
-    const [cycles, stppa, classes, branches, materials, milestones, materialMilestones] = await Promise.all([
+    const [cycles, stppa, classes, branches, materials, milestones, materialMilestones, events] = await Promise.all([
       query(
         `SELECT c.*, b.name AS branch_name, k.name AS class_name,
                 (SELECT count(*)::int FROM cycle_reports cr WHERE cr.cycle_id = c.id) AS report_count
@@ -30,6 +30,15 @@ export async function GET() {
       query("SELECT * FROM materials ORDER BY area, name LIMIT 500"),
       query("SELECT * FROM milestones ORDER BY age_group, indikator LIMIT 500"),
       query("SELECT material_id, milestone_id FROM material_milestones"),
+      query(
+        `SELECT e.*, b.name AS branch_name, k.name AS class_name
+           FROM school_events e
+           JOIN branches b ON b.id = e.branch_id
+           LEFT JOIN classes k ON k.id = e.class_id
+          WHERE ($1::uuid[] IS NULL OR e.branch_id = ANY($1::uuid[]))
+          ORDER BY e.event_date DESC LIMIT 200`,
+        [scope]
+      ),
     ]);
     return NextResponse.json({
       ok: true,
@@ -42,6 +51,7 @@ export async function GET() {
       materials,
       milestones,
       materialMilestones,
+      events,
     });
   } catch (error) {
     return NextResponse.json({ ok: false, error: dbErrorMessage(error) }, { status: 503 });
@@ -70,6 +80,14 @@ type Body = {
   status?: string;
   material_id?: string;
   milestone_id?: string;
+  title?: string;
+  event_date?: string;
+  category?: string;
+  start_time?: string;
+  end_time?: string;
+  location?: string;
+  is_holiday?: boolean;
+  description?: string;
 };
 
 const AREA_MATERIAL = ["practical_life", "language", "sensorial", "mathematics", "cultural", "observasi"];
@@ -268,6 +286,43 @@ export async function POST(request: Request) {
       );
       await catatAudit(denied.user, { action: "milestone.create", entityTable: "milestones", entityId: rows[0].id, detail: { indikator, usia: body.age_group } });
       return NextResponse.json({ ok: true, id: rows[0].id });
+    }
+
+    if (body.kind === "event_create") {
+      const judul = (body.title || "").trim();
+      const KATEGORI = ["pembelajaran", "perayaan", "libur", "olahraga", "seni", "kunjungan", "rapat", "lainnya"];
+      if (!body.branch_id) return NextResponse.json({ ok: false, error: "Cabang wajib dipilih." }, { status: 400 });
+      if (judul.length < 3) return NextResponse.json({ ok: false, error: "Judul kegiatan minimal 3 karakter." }, { status: 400 });
+      if (!body.event_date || !/^\d{4}-\d{2}-\d{2}$/.test(body.event_date)) {
+        return NextResponse.json({ ok: false, error: "Tanggal kegiatan wajib diisi dengan benar." }, { status: 400 });
+      }
+      const kategori = body.category && KATEGORI.includes(body.category) ? body.category : "pembelajaran";
+      const jam = (v?: string) => (v && /^\d{2}:\d{2}/.test(v) ? v.slice(0, 5) : null);
+      const rows = await query<{ id: string }>(
+        `INSERT INTO school_events (branch_id, class_id, title, category, description, event_date, start_time, end_time, location, is_holiday, created_by)
+         VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6::date, $7::time, $8::time, $9, $10,
+                 (SELECT id FROM staff WHERE user_id = $11::uuid LIMIT 1)) RETURNING id`,
+        [body.branch_id, body.class_id || null, judul, kategori, (body.description || "").trim() || null,
+         body.event_date, jam(body.start_time), jam(body.end_time), (body.location || "").trim() || null,
+         Boolean(body.is_holiday), denied.user.id]
+      );
+      await catatAudit(denied.user, { action: "event.create", entityTable: "school_events", entityId: rows[0].id, branchId: body.branch_id, detail: { judul, tanggal: body.event_date, kategori } });
+      return NextResponse.json({ ok: true, id: rows[0].id });
+    }
+
+    if (body.kind === "event_delete") {
+      if (!body.id) return NextResponse.json({ ok: false, error: "ID kegiatan wajib ada." }, { status: 400 });
+      const lama = await query<{ title: string; branch_id: string }>("SELECT title, branch_id FROM school_events WHERE id = $1::uuid", [body.id]);
+      if (!lama[0]) return NextResponse.json({ ok: false, error: "Kegiatan tidak ditemukan." }, { status: 404 });
+      await query("DELETE FROM school_events WHERE id = $1::uuid", [body.id]);
+      await catatAudit(denied.user, { action: "event.delete", entityTable: "school_events", entityId: body.id, branchId: lama[0].branch_id, detail: { judul: lama[0].title } });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (body.kind === "milestone_aktifkan_semua") {
+      const rows = await query<{ id: string }>("UPDATE milestones SET status = 'aktif' WHERE status = 'draf' RETURNING id");
+      await catatAudit(denied.user, { action: "milestone.aktifkan_semua", entityTable: "milestones", detail: { jumlah: rows.length } });
+      return NextResponse.json({ ok: true, jumlah: rows.length });
     }
 
     if (body.kind === "milestone_status") {

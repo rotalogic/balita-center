@@ -36,6 +36,28 @@ export default function AnakPage() {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [mode, setMode] = useState<"aktif" | "sampah">("aktif");
+  const [sampah, setSampah] = useState<Array<Record<string, unknown>> | null>(null);
+  const [sibukPulih, setSibukPulih] = useState("");
+
+  async function muatSampah() {
+    setSampah(null);
+    const r = await fetch("/api/children?trash=1");
+    const d = await r.json();
+    if (d.ok) setSampah(d.children as Array<Record<string, unknown>>);
+    else setError(d.error || "Sampah hanya dapat dibuka Super Admin.");
+  }
+
+  async function pulihkan(id: string) {
+    setSibukPulih(id);
+    const r = await fetch(`/api/children/${id}/sampah`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ restore: true }),
+    });
+    const d = await r.json();
+    setSibukPulih("");
+    if (!d.ok) { setError(d.error || "Gagal memulihkan."); return; }
+    await muatSampah();
+  }
 
   useEffect(() => {
     fetch("/api/children")
@@ -85,13 +107,40 @@ export default function AnakPage() {
           ))}
         </div>
         {shown ? <span className="muted">{shown.length} anak tampil</span> : null}
+        <button type="button" className={mode === "sampah" ? "tab-pill active" : "tab-pill"}
+          onClick={() => { if (mode === "sampah") { setMode("aktif"); } else { setMode("sampah"); void muatSampah(); } }} aria-pressed={mode === "sampah"}>
+          🗑 Sampah
+        </button>
       </div>
       {error ? <ErrorState message={error} /> : null}
       {!children && !error ? <LoadingState /> : null}
-      {shown && shown.length === 0 ? (
+      {mode === "aktif" && shown && shown.length === 0 ? (
         <EmptyState title="Belum ada data anak" body="Database masih kosong atau pencarian tidak menemukan hasil. Tambahkan anak pertama lewat tombol Tambah Anak, setelah data awal cabang, program, dan kelas dibuat." />
       ) : null}
-      {shown && shown.length > 0 ? (
+      {mode === "sampah" ? (
+        <div className="card table-wrap">
+          {!sampah ? <LoadingState /> : sampah.length === 0 ? (
+            <p className="muted" style={{ padding: 16 }}>Sampah kosong. Anak yang dipindahkan ke sampah tampil di sini dan dapat dipulihkan Super Admin.</p>
+          ) : (
+            <table>
+              <thead><tr><th>Nama Anak</th><th>Cabang</th><th>Dipindahkan</th><th>Oleh</th><th>Alasan</th><th></th></tr></thead>
+              <tbody>
+                {sampah.map((c) => (
+                  <tr key={String(c.id)}>
+                    <td><strong>{String(c.full_name)}</strong></td>
+                    <td>{String(c.branch_name || "-")}</td>
+                    <td>{c.deleted_at ? new Date(String(c.deleted_at)).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "-"}</td>
+                    <td>{String(c.oleh || "-")}</td>
+                    <td>{String(c.deleted_reason || "-")}</td>
+                    <td><button type="button" className="btn small secondary" disabled={sibukPulih === String(c.id)} onClick={() => void pulihkan(String(c.id))}>{sibukPulih === String(c.id) ? "Memulihkan…" : "Pulihkan"}</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      ) : null}
+      {mode === "aktif" && shown && shown.length > 0 ? (
         <div className="card table-wrap">
           <table>
             <thead>

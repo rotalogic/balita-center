@@ -12,7 +12,10 @@ export async function middleware(request: NextRequest) {
   // /api/jobs/* diautentikasi oleh header x-job-token yang divalidasi di dalam
   // route-nya sendiri; tanpa pengecualian ini cron tidak akan pernah sampai.
   const jobDenganToken = pathname.startsWith("/api/jobs/") && Boolean(request.headers.get("x-job-token"));
-  const publicApi = pathname.startsWith("/api/auth/") || pathname.startsWith("/api/whatsapp/") || pathname === "/api/health" || jobDenganToken;
+  // Webhook payment gateway diautentikasi oleh signature Midtrans yang
+  // diverifikasi di route-nya, bukan sesi pengguna.
+  const webhookGateway = pathname.startsWith("/api/payments/");
+  const publicApi = pathname.startsWith("/api/auth/") || pathname.startsWith("/api/whatsapp/") || pathname === "/api/health" || jobDenganToken || webhookGateway;
   if (PUBLIC_PAGES.includes(pathname) || publicApi) {
     return NextResponse.next();
   }

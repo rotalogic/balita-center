@@ -39,8 +39,22 @@ type Milestone = {
   montessori_area: string | null;
   status: string;
 };
+type Kegiatan = {
+  id: string;
+  title: string;
+  category: string;
+  description: string | null;
+  event_date: string;
+  start_time: string | null;
+  end_time: string | null;
+  location: string | null;
+  is_holiday: boolean;
+  branch_name: string;
+  class_name: string | null;
+};
 type Data = {
   cycles: Cycle[];
+  events: Kegiatan[];
   stppa: Butir[];
   classes: Array<{ id: string; name: string; branch_id: string }>;
   branches: Array<{ id: string; name: string }>;
@@ -128,6 +142,7 @@ export default function AkademikPage() {
 
   const [matForm, setMatForm] = useState({ name: "", name_en: "", area: "practical_life", age_group: "3-6" });
   const [msForm, setMsForm] = useState({ indikator: "", age_group: "3-<4", aspect: "kognitif", montessori_area: "" });
+  const [evForm, setEvForm] = useState({ branch_id: "", class_id: "", title: "", category: "pembelajaran", event_date: "", start_time: "", end_time: "", location: "", is_holiday: false, description: "" });
   const [petaPilihan, setPetaPilihan] = useState<Record<string, string>>({});
 
   async function simpanKatalog(payload: Record<string, unknown>, pesan: string) {
@@ -421,6 +436,14 @@ export default function AkademikPage() {
         <p className="muted" style={{ marginTop: 0 }}>
           Milestone baru mulai sebagai <strong>draf</strong>. Tinjau lalu aktifkan supaya tampil penuh di pemilih editor laporan; arsipkan yang tidak dipakai lagi.
         </p>
+        {(data.milestones || []).some((m) => m.status === "draf") ? (
+          <p style={{ marginTop: 0 }}>
+            <button type="button" className="btn small secondary" disabled={busy === "katalog"}
+              onClick={() => void simpanKatalog({ kind: "milestone_aktifkan_semua" }, "Semua milestone draf diaktifkan.")}>
+              Aktifkan Semua Draf ({(data.milestones || []).filter((m) => m.status === "draf").length})
+            </button>
+          </p>
+        ) : null}
         <div className="form-grid">
           <div className="field"><label htmlFor="ms-indikator">Indikator *</label>
             <input id="ms-indikator" value={msForm.indikator} onChange={(e) => setMsForm({ ...msForm, indikator: e.target.value })} placeholder="mis. Mengurutkan benda dari kecil ke besar" /></div>
@@ -479,6 +502,85 @@ export default function AkademikPage() {
             </table>
           </div>
         ) : null}
+      </div>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <h2 style={{ marginTop: 0 }}>Kegiatan Sekolah ({(data.events || []).length})</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Kegiatan tampil di Dashboard staf dan di Balita Connect orang tua. Tandai <strong>hari libur</strong> untuk hari tanpa kegiatan belajar.
+        </p>
+        <div className="form-grid">
+          <div className="field"><label htmlFor="ev-judul">Judul Kegiatan *</label>
+            <input id="ev-judul" value={evForm.title} onChange={(e) => setEvForm({ ...evForm, title: e.target.value })} placeholder="mis. Kunjungan ke Kebun Binatang" /></div>
+          <div className="field"><label htmlFor="ev-cabang">Cabang *</label>
+            <select id="ev-cabang" value={evForm.branch_id} onChange={(e) => setEvForm({ ...evForm, branch_id: e.target.value })}>
+              <option value="">Pilih cabang…</option>
+              {data.branches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}
+            </select></div>
+          <div className="field"><label htmlFor="ev-kelas">Kelas (kosongkan = semua kelas)</label>
+            <select id="ev-kelas" value={evForm.class_id} onChange={(e) => setEvForm({ ...evForm, class_id: e.target.value })}>
+              <option value="">Semua kelas</option>
+              {data.classes.filter((k) => !evForm.branch_id || k.branch_id === evForm.branch_id).map((k) => (<option key={k.id} value={k.id}>{k.name}</option>))}
+            </select></div>
+          <div className="field"><label htmlFor="ev-kategori">Kategori</label>
+            <select id="ev-kategori" value={evForm.category} onChange={(e) => setEvForm({ ...evForm, category: e.target.value })}>
+              <option value="pembelajaran">Pembelajaran</option>
+              <option value="perayaan">Perayaan</option>
+              <option value="olahraga">Olahraga</option>
+              <option value="seni">Seni</option>
+              <option value="kunjungan">Kunjungan</option>
+              <option value="rapat">Rapat</option>
+              <option value="libur">Libur</option>
+              <option value="lainnya">Lainnya</option>
+            </select></div>
+          <div className="field"><label htmlFor="ev-tanggal">Tanggal *</label>
+            <input id="ev-tanggal" type="date" value={evForm.event_date} onChange={(e) => setEvForm({ ...evForm, event_date: e.target.value })} /></div>
+          <div className="field"><label htmlFor="ev-mulai">Jam Mulai</label>
+            <input id="ev-mulai" type="time" value={evForm.start_time} onChange={(e) => setEvForm({ ...evForm, start_time: e.target.value })} /></div>
+          <div className="field"><label htmlFor="ev-selesai">Jam Selesai</label>
+            <input id="ev-selesai" type="time" value={evForm.end_time} onChange={(e) => setEvForm({ ...evForm, end_time: e.target.value })} /></div>
+          <div className="field"><label htmlFor="ev-lokasi">Lokasi</label>
+            <input id="ev-lokasi" value={evForm.location} onChange={(e) => setEvForm({ ...evForm, location: e.target.value })} placeholder="mis. Halaman sekolah" /></div>
+          <div className="field"><label htmlFor="ev-deskripsi">Deskripsi</label>
+            <input id="ev-deskripsi" value={evForm.description} onChange={(e) => setEvForm({ ...evForm, description: e.target.value })} placeholder="Keterangan singkat untuk orang tua" /></div>
+          <div className="field"><label htmlFor="ev-libur">Hari Libur</label>
+            <label style={{ display: "flex", gap: 8, alignItems: "center", fontWeight: 400 }}>
+              <input id="ev-libur" type="checkbox" checked={evForm.is_holiday} onChange={(e) => setEvForm({ ...evForm, is_holiday: e.target.checked })} />
+              Tandai sebagai hari libur
+            </label></div>
+        </div>
+        <p>
+          <button type="button" className="btn" disabled={busy === "katalog"}
+            onClick={() => void simpanKatalog({ kind: "event_create", ...evForm, class_id: evForm.class_id || undefined }, "Kegiatan ditambahkan.")}>
+            + Tambah Kegiatan
+          </button>
+        </p>
+        {(data.events || []).length > 0 ? (
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Tanggal</th><th>Kegiatan</th><th>Kategori</th><th>Cabang / Kelas</th><th>Waktu</th><th>Aksi</th></tr></thead>
+              <tbody>
+                {(data.events || []).map((e) => (
+                  <tr key={e.id}>
+                    <td>{tanggalPanjang(String(e.event_date).slice(0, 10))}</td>
+                    <td><strong>{e.title}</strong>{e.is_holiday ? <span className="badge warn" style={{ marginLeft: 6 }}>Libur</span> : null}
+                      {e.description ? <div className="muted">{e.description}</div> : null}
+                      {e.location ? <div className="muted">📍 {e.location}</div> : null}</td>
+                    <td>{e.category}</td>
+                    <td>{e.branch_name}{e.class_name ? ` · ${e.class_name}` : " · Semua kelas"}</td>
+                    <td>{e.start_time ? `${String(e.start_time).slice(0, 5)}${e.end_time ? `–${String(e.end_time).slice(0, 5)}` : ""}` : "—"}</td>
+                    <td>
+                      <button type="button" className="btn small danger" disabled={busy === "katalog"}
+                        onClick={() => { if (window.confirm(`Hapus kegiatan "${e.title}"?`)) void simpanKatalog({ kind: "event_delete", id: e.id }, "Kegiatan dihapus."); }}>
+                        Hapus
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (<p className="muted">Belum ada kegiatan tercatat.</p>)}
       </div>
     </>
   );

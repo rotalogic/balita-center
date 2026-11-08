@@ -37,6 +37,7 @@ psql "$DATABASE_URL" -f database/migrasi-rapor.sql
 psql "$DATABASE_URL" -f database/migrasi-media.sql
 psql "$DATABASE_URL" -f database/migrasi-ailsa-kunci.sql
 psql "$DATABASE_URL" -f database/migrasi-ailsa-channel.sql
+psql "$DATABASE_URL" -f database/migrasi-gateway.sql
 ```
 
 Semua migrasi memakai `IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`,
@@ -110,7 +111,21 @@ Cara kerja pengiriman tagihan per tagihan baru:
 Setiap pengiriman tercatat di tabel `invoice_notifications`
 (channel: dalam_aplikasi / email / whatsapp).
 
-## 7. Sesudah deploy — tiga hal di dalam aplikasi
+## 7. Payment gateway Midtrans (opsional, bisa menyusul)
+
+1. Di dashboard Midtrans sekolah: ambil Server Key & Client Key
+   (Settings → Access Keys), dan atur **Payment Notification URL** ke
+   `https://balita.rotalogic.id/api/payments/webhook`.
+2. Di aplikasi: halaman Keuangan → kartu "Payment Gateway — Midtrans" →
+   tempel kedua kunci, mulai dari mode **Sandbox**, Simpan, lalu Uji
+   Server Key. Aktifkan bila uji sandbox sudah benar.
+3. Sesudah aktif, orang tua melihat tombol **Bayar Sekarang** di Balita
+   Connect; status Lunas + kwitansi berjalan otomatis dari webhook.
+   Pembayaran manual oleh staf tetap berjalan berdampingan.
+4. Pindah ke mode **Produksi** hanya sesudah alur sandbox terverifikasi
+   dengan satu pembayaran uji sungguhan di sandbox.
+
+## 8. Sesudah deploy — tiga hal di dalam aplikasi
 
 1. **Tempel kunci DeepSeek asli**: halaman Ailsa → kartu "Kunci LLM —
    DeepSeek" → tempel kunci, pilih/ muat model, Simpan, lalu Uji
@@ -121,7 +136,7 @@ Setiap pengiriman tercatat di tabel `invoice_notifications`
    manual kini memakai izin `finance.manage`) atau lewat skrip di
    langkah 6, lalu periksa `invoice_notifications` untuk periode uji.
 
-## 8. Catatan perbaikan yang ikut dalam rilis ini
+## 9. Catatan perbaikan yang ikut dalam rilis ini
 
 - Middleware kini mengecualikan `/api/jobs/*` bila membawa header
   `x-job-token` (token tetap divalidasi di route). Sebelumnya cron
@@ -130,7 +145,7 @@ Setiap pengiriman tercatat di tabel `invoice_notifications`
 - Izin jalur manual job diperbaiki dari `finance.update` (tidak ada di
   sistem izin) menjadi `finance.manage`.
 
-## 9. File workflow GitHub (terpisah dari deploy)
+## 10. File workflow GitHub (terpisah dari deploy)
 
 `.github/workflows/build.yml` (isi sama dengan `build-check-workflow.yml`
 di akar repo bila masih ada) perlu ditambahkan lewat web GitHub atau git
