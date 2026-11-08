@@ -133,6 +133,7 @@ export default function DailyReportsPage() {
   return (
     <>
       <PageHead title="Daily Reports" subtitle="Laporan harian anak — draft, review, dan terbit" />
+      <KartuUnduhMassalLaporan />
       {galat ? <div className="alert alert-error" role="alert">{galat}</div> : null}
       {pesan ? <div className="alert alert-ok" role="status">{pesan}</div> : null}
 
@@ -255,5 +256,40 @@ export default function DailyReportsPage() {
         </div>
       ) : null}
     </>
+  );
+}
+
+function KartuUnduhMassalLaporan() {
+  const [classes, setClasses] = useState<Array<{ id: string; name: string }>>([]);
+  const [kelas, setKelas] = useState("");
+  const [tanggal, setTanggal] = useState(() => new Date().toISOString().slice(0, 10));
+  useEffect(() => {
+    fetch("/api/academic").then((r) => r.json()).then((d) => (d.ok ? setClasses(d.classes || []) : null)).catch(() => null);
+  }, []);
+  return (
+    <article className="card" style={{ marginBottom: 16 }}>
+      <h2 style={{ marginTop: 0 }}>Unduh Massal per Kelas &amp; Tanggal</h2>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Semua laporan <strong>terbit</strong> satu kelas pada satu tanggal digabungkan menjadi satu berkas PDF (urutan nama anak).
+      </p>
+      <div className="row" style={{ gap: 10, alignItems: "end", flexWrap: "wrap" }}>
+        <div className="field" style={{ minWidth: 220 }}>
+          <label htmlFor="massal-kelas">Kelas</label>
+          <select id="massal-kelas" value={kelas} onChange={(e) => setKelas(e.target.value)}>
+            <option value="">— Pilih kelas —</option>
+            {classes.map((k) => (<option key={k.id} value={k.id}>{k.name}</option>))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="massal-tanggal">Tanggal</label>
+          <input id="massal-tanggal" type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} />
+        </div>
+        {kelas && tanggal ? (
+          <a className="btn" href={`/api/dokumen/laporan/massal?kelas=${kelas}&tanggal=${tanggal}`}>Unduh PDF Gabungan</a>
+        ) : (
+          <button type="button" className="btn" disabled>Unduh PDF Gabungan</button>
+        )}
+      </div>
+    </article>
   );
 }

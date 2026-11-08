@@ -58,6 +58,7 @@ export default function RaporListPage() {
   return (
     <>
       <PageHead title="Rapor Perkembangan" subtitle="Rapor periodik per siklus belajar — narasi STPPA, area Montessori, kesimpulan, dan saran untuk orang tua" />
+      <KartuUnduhMassalRapor siklus={siklus} />
       {error ? <ErrorState message={error} /> : null}
       {info ? <p className="success" role="status">{info}</p> : null}
 
@@ -112,5 +113,32 @@ export default function RaporListPage() {
         </div>
       )}
     </>
+  );
+}
+
+function KartuUnduhMassalRapor({ siklus }: { siklus: Siklus[] }) {
+  const [pilih, setPilih] = useState("");
+  return (
+    <article className="card" style={{ marginBottom: 16 }}>
+      <h2 style={{ marginTop: 0 }}>Unduh Massal per Siklus</h2>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Semua rapor <strong>terbit</strong> pada satu siklus digabungkan menjadi satu berkas PDF (urutan nama anak) —
+        praktis untuk dicetak atau dibagikan sekaligus.
+      </p>
+      <div className="row" style={{ gap: 10, alignItems: "end", flexWrap: "wrap" }}>
+        <div className="field" style={{ minWidth: 280 }}>
+          <label htmlFor="massal-siklus">Siklus Belajar</label>
+          <select id="massal-siklus" value={pilih} onChange={(e) => setPilih(e.target.value)}>
+            <option value="">— Pilih siklus —</option>
+            {siklus.map((s) => (<option key={s.id} value={s.id}>{s.theme}{s.class_name ? ` · ${s.class_name}` : ""}</option>))}
+          </select>
+        </div>
+        {pilih ? (
+          <a className="btn" href={`/api/dokumen/rapor/massal?siklus=${pilih}`}>Unduh PDF Gabungan</a>
+        ) : (
+          <button type="button" className="btn" disabled>Unduh PDF Gabungan</button>
+        )}
+      </div>
+    </article>
   );
 }

@@ -504,6 +504,8 @@ export default function AkademikPage() {
         ) : null}
       </div>
 
+      <KartuPromosi classes={data.classes} onDone={load} />
+
       <div className="card" style={{ marginTop: 12 }}>
         <h2 style={{ marginTop: 0 }}>Kegiatan Sekolah ({(data.events || []).length})</h2>
         <p className="muted" style={{ marginTop: 0 }}>
@@ -583,5 +585,101 @@ export default function AkademikPage() {
         ) : (<p className="muted">Belum ada kegiatan tercatat.</p>)}
       </div>
     </>
+  );
+}
+
+type SiswaPromosi = { id: string; full_name: string; sejak: string };
+
+function KartuPromosi({ classes, onDone }: { classes: Array<{ id: string; name: string; branch_id: string }>; onDone: () => void }) {
+  const [dari, setDari] = useState("");
+  const [ke, setKe] = useState("");
+  const [tanggal, setTanggal] = useState(() => new Date().toISOString().slice(0, 10));
+  const [siswa, setSiswa] = useState<SiswaPromosi[] | null>(null);
+  const [pilih, setPilih] = useState<Record<string, boolean>>({});
+  const [sibuk, setSibuk] = useState(false);
+  const [info, setInfo] = useState<{ ok: boolean; text: string } | null>(null);
+
+  useEffect(() => {
+    if (!dari) { setSiswa(null); return; }
+    fetch(`/api/promosi?kelas=${dari}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok) {
+          setSiswa(d.siswa);
+          setPilih(Object.fromEntries(d.siswa.map((x: SiswaPromosi) => [x.id, true])));
+        } else setSiswa([]);
+      })
+      .catch(() => setSiswa([]));
+  }, [dari]);
+
+  const terpilih = siswa ? siswa.filter((x) => pilih[x.id]) : [];
+  const tujuanValid = classes.filter((k) => k.id !== dari && (!dari || k.branch_id === classes.find((c) => c.id === dari)?.branch_id));
+
+  async function jalankan() {
+    setSibuk(true);
+    setInfo(null);
+    const r = await fetch("/api/promosi", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dari_kelas_id: dari, ke_kelas_id: ke, anak_ids: terpilih.map((x) => x.id), tanggal_mulai: tanggal }),
+    });
+    const d = await r.json();
+    setSibuk(false);
+    if (d.ok) {
+      setInfo({ ok: true, text: d.pesan || "Promosi selesai." });
+      setDari("");
+      setKe("");
+      setSiswa(null);
+      onDone();
+    } else setInfo({ ok: false, text: d.error || "Promosi gagal." });
+  }
+
+  return (
+    <article className="card">
+      <h2 style={{ marginTop: 0 }}>Promosi / Kenaikan Kelas</h2>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Pindahkan anak dari kelas asal ke kelas tujuan dalam cabang yang sama. Pendaftaran di kelas lama
+        ditutup berstatus selesai (riwayat tersimpan) dan pendaftaran baru dibuka mulai tanggal yang dipilih.
+      </p>
+      <div className="form-grid">
+        <div className="field"><label htmlFor="pro-dari">Kelas Asal</label>
+          <select id="pro-dari" value={dari} onChange={(e) => { setDari(e.target.value); setKe(""); }}>
+            <option value="">— Pilih kelas asal —</option>
+            {classes.map((k) => (<option key={k.id} value={k.id}>{k.name}</option>))}
+          </select></div>
+        <div className="field"><label htmlFor="pro-ke">Kelas Tujuan</label>
+          <select id="pro-ke" value={ke} onChange={(e) => setKe(e.target.value)} disabled={!dari}>
+            <option value="">— Pilih kelas tujuan —</option>
+            {tujuanValid.map((k) => (<option key={k.id} value={k.id}>{k.name}</option>))}
+          </select></div>
+        <div className="field"><label htmlFor="pro-tgl">Mulai di Kelas Baru</label>
+          <input id="pro-tgl" type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} /></div>
+      </div>
+      {dari ? (
+        siswa === null ? <p className="muted">Memuat daftar anak…</p> :
+        siswa.length === 0 ? <p className="muted">Tidak ada anak aktif di kelas ini.</p> : (
+          <div style={{ marginTop: 8 }}>
+            <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13.5, marginBottom: 6 }}>
+              <input type="checkbox" checked={terpilih.length === siswa.length}
+                onChange={(e) => setPilih(Object.fromEntries(siswa.map((x) => [x.id, e.target.checked])))} />
+              Pilih semua ({terpilih.length}/{siswa.length} terpilih)
+            </label>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 4 }}>
+              {siswa.map((x) => (
+                <label key={x.id} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13.5, background: "#faf7f2", borderRadius: 8, padding: "6px 10px" }}>
+                  <input type="checkbox" checked={!!pilih[x.id]} onChange={(e) => setPilih({ ...pilih, [x.id]: e.target.checked })} />
+                  {x.full_name}
+                </label>
+              ))}
+            </div>
+          </div>
+        )
+      ) : null}
+      <div className="row" style={{ marginTop: 12 }}>
+        <button type="button" className="btn" disabled={sibuk || !ke || terpilih.length === 0} onClick={() => void jalankan()}>
+          {sibuk ? "Memproses…" : `Promosikan ${terpilih.length} Anak`}
+        </button>
+      </div>
+      {info ? <p className={info.ok ? "notice ok" : "notice"} role="status" style={{ marginTop: 10 }}>{info.text}</p> : null}
+    </article>
   );
 }
