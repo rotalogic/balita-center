@@ -1,5 +1,7 @@
 "use client";
 
+import { tanggalPanjang } from "@/lib/format";
+
 import Link from "next/link";
 import { EmptyState, ErrorState, LoadingState, PageHead } from "@/components/chrome";
 import { childAgeLabel, useConnect } from "@/lib/use-connect";
@@ -35,7 +37,7 @@ export default function ConnectDashboardPage() {
           <ul className="timeline">
             <li><span aria-hidden="true">✉</span><div><strong>{data.messages.length} pesan</strong><div className="muted">tercatat untuk anak ini. <Link href="/connect/pesan">Buka Pesan</Link></div></div></li>
             <li><span aria-hidden="true">▦</span><div><strong>{data.events.length} kegiatan</strong><div className="muted">terjadwal di sekitar minggu ini. <Link href="/connect/kegiatan">Lihat Kegiatan</Link></div></div></li>
-            <li><span aria-hidden="true">✓</span><div><strong>{data.report ? "Daily report terbit tersedia" : "Belum ada daily report terbit"}</strong><div className="muted">{data.report ? String(data.report.report_date) : "Laporan tampil setelah diterbitkan guru dan reviewer."}</div></div></li>
+            <li><span aria-hidden="true">✓</span><div><strong>{data.report ? "Daily report terbit tersedia" : "Belum ada daily report terbit"}</strong><div className="muted">{data.report ? tanggalPanjang(String(data.report.report_date)) : "Laporan tampil setelah diterbitkan guru dan reviewer."}</div></div></li>
           </ul>
         </article>
       </section>

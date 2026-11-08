@@ -1,44 +1,75 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 
-// Layar login meniru tampilan versi Muse: panel visual kiri + kartu login kanan.
-// PENTING: ini login konteks kerja berlabel, BUKAN autentikasi sungguhan.
-// Kata sandi tidak diperiksa dan tidak dikirim ke mana pun; memilih peran hanya
-// menyimpan label peran di peramban untuk ditampilkan di topbar. Produksi wajib
-// mengganti halaman ini dengan Auth.js/NextAuth yang memeriksa kredensial.
-const ROLES = [
-  { value: "Super Admin", target: "/" },
-  { value: "Kepala Sekolah", target: "/" },
-  { value: "Admin Cabang", target: "/" },
-  { value: "Guru / Fasilitator", target: "/daily-reports" },
-  { value: "Staf Administrasi", target: "/" },
-  { value: "Bendahara", target: "/keuangan" },
-  { value: "Investor", target: "/investor" },
-  { value: "Orang Tua", target: "/connect" },
-  { value: "Kandidat / Calon Karyawan", target: "/" },
-  { value: "Tamu / Calon Orang Tua", target: "/connect" },
-];
-
+// Login sungguhan: kredensial diperiksa ke tabel users (scrypt) dan sesi
+// disimpan sebagai cookie bertanda tangan. Tampilan mengikuti versi Muse.
 export default function LoginPage() {
-  const router = useRouter();
-  const [role, setRole] = useState(ROLES[0]);
+  const [stage, setStage] = useState<"credentials" | "totp">("credentials");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [sesiHabis] = useState(
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("sesi") === "berakhir"
+  );
 
-  function masuk(event: React.FormEvent) {
+  function goNext() {
+    const next = new URLSearchParams(window.location.search).get("next");
+    window.location.href = next && next.startsWith("/") ? next : "/";
+  }
+
+  async function submitCredentials(event: React.FormEvent) {
     event.preventDefault();
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError("Format email belum benar.");
-      return;
-    }
+    setBusy(true);
+    setError(null);
     try {
-      window.localStorage.setItem("bc-role", role.value);
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await response.json();
+      if (data.needs2fa) {
+        setStage("totp");
+        setBusy(false);
+        return;
+      }
+      if (!data.ok) {
+        setError(data.error || "Email atau kata sandi salah.");
+        setBusy(false);
+        return;
+      }
+      goNext();
     } catch {
-      // penyimpanan lokal tidak tersedia; tetap lanjut masuk
+      setError("Tidak dapat menghubungi server.");
+      setBusy(false);
     }
-    router.push(role.target);
+  }
+
+  async function submitCode(event: React.FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/auth/login/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      const data = await response.json();
+      if (!data.ok) {
+        setError(data.error || "Kode 2FA salah.");
+        setBusy(false);
+        return;
+      }
+      goNext();
+    } catch {
+      setError("Tidak dapat menghubungi server.");
+      setBusy(false);
+    }
   }
 
   return (
@@ -51,36 +82,100 @@ export default function LoginPage() {
           <div className="login-hero-dots"><span /><span /><span /></div>
         </div>
       </section>
-      <section className="login-card-wrap">
-        <form className="login-card" onSubmit={masuk}>
-          <div className="brand" style={{ padding: 0 }}>
-            <span className="brand-mark" aria-hidden="true">✿</span>
-            <span className="brand-name">Balita Center</span>
-          </div>
-          <h1 style={{ fontSize: 24, marginTop: 14 }}>Selamat Datang</h1>
-          <p className="muted" style={{ marginTop: 4 }}>Masuk untuk melanjutkan ke ruang kerja Anda.</p>
 
-          <div className="field" style={{ marginTop: 16 }}>
-            <label htmlFor="email">Email</label>
-            <input id="email" type="email" autoComplete="username" placeholder="nama@balitacenter.sch.id" value={email} onChange={(e) => setEmail(e.target.value)} />
-          </div>
-          <div className="field" style={{ marginTop: 12 }}>
-            <label htmlFor="password">Kata Sandi</label>
-            <input id="password" type="password" autoComplete="current-password" placeholder="••••••••" />
-            <span className="hint">Pada paket ini kata sandi tidak diperiksa (belum ada autentikasi sungguhan).</span>
-          </div>
-          <div className="field" style={{ marginTop: 12 }}>
-            <label htmlFor="role">Masuk sebagai peran</label>
-            <select id="role" value={role.value} onChange={(e) => setRole(ROLES.find((r) => r.value === e.target.value) || ROLES[0])}>
-              {ROLES.map((r) => (<option key={r.value} value={r.value}>{r.value}</option>))}
-            </select>
-          </div>
-          {error ? <p className="notice" role="alert" style={{ marginTop: 12 }}>{error}</p> : null}
-          <button className="btn" type="submit" style={{ width: "100%", marginTop: 18 }}>Masuk</button>
-          <p className="notice" role="note" style={{ marginTop: 14 }}>
-            Konteks kerja simulasi untuk mencoba aplikasi. Belum ada login kata sandi atau Google/Microsoft sungguhan di paket ini.
-          </p>
-        </form>
+      <section className="login-card-wrap">
+        {stage === "credentials" ? (
+          <form className="login-card" onSubmit={submitCredentials}>
+            <div className="brand" style={{ padding: 0 }}>
+              <span className="brand-mark" aria-hidden="true">✿</span>
+              <span className="brand-name">Balita Center</span>
+            </div>
+            <h1 style={{ fontSize: 24, marginTop: 14 }}>Selamat Datang</h1>
+            <p className="muted" style={{ marginTop: 4 }}>Masuk untuk melanjutkan ke ruang kerja Anda.</p>
+
+            <div className="field" style={{ marginTop: 16 }}>
+              <label htmlFor="email">Email</label>
+              <input
+                id="email"
+                type="email"
+                required
+                autoFocus
+                autoComplete="username"
+                placeholder="nama@balitacenter.sch.id"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </div>
+
+            <div className="field" style={{ marginTop: 12 }}>
+              <label htmlFor="password">Kata Sandi</label>
+              <input
+                id="password"
+                type="password"
+                required
+                autoComplete="current-password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </div>
+
+            {error ? <p className="notice" role="alert" style={{ marginTop: 12 }}>{error}</p> : null}
+
+            <button className="btn" type="submit" disabled={busy} style={{ width: "100%", marginTop: 18 }}>
+              {busy ? "Memeriksa…" : "Masuk"}
+            </button>
+
+            <p className="notice" role="note" style={{ marginTop: 14 }}>
+              <Link href="/forgot">Lupa kata sandi?</Link>
+              {" · "}
+              <Link href="/register">Daftar akun</Link>
+            </p>
+          </form>
+        ) : (
+          <form className="login-card" onSubmit={submitCode}>
+            <div className="brand" style={{ padding: 0 }}>
+              <span className="brand-mark" aria-hidden="true">✿</span>
+              <span className="brand-name">Balita Center</span>
+            </div>
+            <h1 style={{ fontSize: 24, marginTop: 14 }}>Verifikasi 2FA</h1>
+            <p className="muted" style={{ marginTop: 4 }}>
+              Masukkan kode 6 digit dari aplikasi authenticator.
+            </p>
+
+            <div className="field" style={{ marginTop: 16 }}>
+              <label htmlFor="code">Kode 2FA</label>
+              <input
+                id="code"
+                inputMode="numeric"
+                maxLength={6}
+                required
+                autoFocus
+                placeholder="000000"
+                value={code}
+                onChange={(event) => setCode(event.target.value)}
+              />
+            </div>
+
+            {error ? <p className="notice" role="alert" style={{ marginTop: 12 }}>{error}</p> : null}
+
+            <button className="btn" type="submit" disabled={busy} style={{ width: "100%", marginTop: 18 }}>
+              {busy ? "Memeriksa…" : "Verifikasi"}
+            </button>
+            <button
+              type="button"
+              className="btn sec"
+              style={{ width: "100%", marginTop: 10 }}
+              onClick={() => {
+                setStage("credentials");
+                setCode("");
+                setError(null);
+              }}
+            >
+              Kembali
+            </button>
+          </form>
+        )}
       </section>
     </div>
   );

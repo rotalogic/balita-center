@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { tanggalPanjang } from "@/lib/format";
+
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ErrorState, PageHead } from "@/components/chrome";
+import { TimeInput } from "@/components/time-input";
+import { useUpload } from "@/components/upload";
+import { SyaratChecklist, cekSyaratLokal } from "@/components/syarat-checklist";
 
 type Meta = {
   branches: Array<{ id: string; name: string }>;
@@ -10,8 +15,11 @@ type Meta = {
   staff: Array<{ id: string; branch_id: string; full_name: string; position: string }>;
 };
 type Child = { id: string; full_name: string; branch_name: string };
-type Activity = { title: string; apparatus: string; area: string; rating: string; photo_url: string; activity_time: string; notes: string };
-const emptyActivity: Activity = { title: "", apparatus: "", area: "", rating: "5", photo_url: "", activity_time: "", notes: "" };
+type Activity = { title: string; apparatus: string; area: string; rating: string; photo_url: string; activity_time: string; notes: string; work_location: string; work_mode: string };
+const emptyActivity: Activity = { title: "", apparatus: "", area: "", rating: "4", photo_url: "", activity_time: "", notes: "", work_location: "", work_mode: "" };
+const AREA_OPSI = [["practical_life", "Practical Life"], ["language", "Language"], ["sensorial", "Sensorial"], ["mathematics", "Mathematics"], ["cultural", "Cultural"], ["observasi", "Observasi"]];
+const LOKASI_OPSI = [["lantai", "Lantai"], ["meja", "Meja"], ["alas", "Alas Kerja"]];
+const MODE_OPSI = [["sendiri", "Sendiri"], ["berpasangan", "Berpasangan"], ["kelompok_kecil", "Kelompok Kecil"], ["kelompok_besar", "Kelompok Besar"]];
 const LEVELS = ["tidak", "sedikit", "cukup", "banyak"];
 const NAP = [["buruk", "Buruk"], ["cukup", "Cukup"], ["baik", "Baik"], ["sangat_baik", "Sangat Baik"]];
 const MOODS = [["sedih", "😢 Sedih"], ["cemas", "😟 Cemas"], ["biasa", "😐 Biasa"], ["ceria", "😊 Ceria"], ["sangat_ceria", "😄 Sangat Ceria"]];
@@ -23,13 +31,127 @@ export default function BuatDailyReportPage() {
   const [form, setForm] = useState<Record<string, string>>({ report_date: new Date().toISOString().slice(0, 10), meal_level: "banyak", snack_level: "banyak", nap_quality: "baik", mood: "ceria" });
   const [activities, setActivities] = useState<Activity[]>([{ ...emptyActivity }]);
   const [photoUrls, setPhotoUrls] = useState<string[]>([""]);
-  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [result, setResult] = useState<{ ok: boolean; message: string; existingId?: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const [reportId, setReportId] = useState<string | null>(null);
+  // Blok 1C: form tidak boleh bisa diisi sebelum data draft selesai dimuat,
+  // supaya isi tersimpan tidak tertimpa form kosong.
+  const [siap, setSiap] = useState(false);
+  const upload = useUpload();
+  const [dipulihkan, setDipulihkan] = useState(false);
+  const [simpanTerakhir, setSimpanTerakhir] = useState<string | null>(null);
+  const [statusLaporan, setStatusLaporan] = useState<string>("");
+  const kunciDraf = `bc-draf-${reportId ?? "baru"}`;
+
   useEffect(() => {
-    fetch("/api/meta").then((r) => r.json()).then((d) => (d.ok ? setMeta(d) : setError(d.error))).catch(() => setError("Tidak dapat menghubungi server."));
-    fetch("/api/children").then((r) => r.json()).then((d) => (d.ok ? setChildren(d.children) : null)).catch(() => null);
+    const id = new URLSearchParams(window.location.search).get("id");
+
+    const metaTask = fetch("/api/meta")
+      .then((r) => r.json())
+      .then((d) => (d.ok ? setMeta(d) : setError(d.error)))
+      .catch(() => setError("Tidak dapat menghubungi server."));
+    const childTask = fetch("/api/children")
+      .then((r) => r.json())
+      .then((d) => (d.ok ? setChildren(d.children) : null))
+      .catch(() => null);
+
+    if (!id) {
+      void Promise.all([metaTask, childTask]).then(() => setSiap(true));
+      return;
+    }
+
+    setReportId(id);
+    const reportTask = fetch(`/api/daily-reports/${id}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.ok) {
+          setError(d.error || "Laporan tidak bisa dimuat.");
+          return;
+        }
+        const r = d.report as Record<string, unknown>;
+        setStatusLaporan(String(r.status ?? ""));
+        const jam = (v: unknown) => (typeof v === "string" ? v.slice(0, 5) : "");
+        // Setiap field diisi dari respons server — termasuk yang kosong — lalu
+        // form baru dibuka. Tidak ada jendela waktu untuk menimpa data.
+        setForm({
+          branch_id: String(r.branch_id ?? ""),
+          child_id: String(r.child_id ?? ""),
+          class_id: String(r.class_id ?? ""),
+          created_by: String(r.created_by ?? ""),
+          lead_facilitator_id: String(r.lead_facilitator_id ?? ""),
+          report_date: String(r.report_date ?? "").slice(0, 10),
+          meals_text: String(r.meals_text ?? ""),
+          snack_text: String(r.snack_text ?? ""),
+          meal_level: String(r.meal_level ?? ""),
+          snack_level: String(r.snack_level ?? ""),
+          nap_quality: String(r.nap_quality ?? ""),
+          nap_start: jam(r.nap_start),
+          nap_end: jam(r.nap_end),
+          toilet_pee_count: String(r.toilet_pee_count ?? 0),
+          toilet_poop_count: String(r.toilet_poop_count ?? 0),
+          mood: String(r.mood ?? ""),
+          mood_notes: String(r.mood_notes ?? ""),
+          notes: String(r.notes ?? ""),
+          circle_theme: String(r.circle_theme ?? ""),
+          circle_rating: String(r.circle_rating ?? ""),
+          circle_notes: String(r.circle_notes ?? ""),
+          special_moment: String(r.special_moment ?? ""),
+          home_suggestion: String(r.home_suggestion ?? ""),
+        });
+        const rows = (d.activities || []) as Array<Record<string, unknown>>;
+        setActivities(
+          rows.length > 0
+            ? rows.map((a) => ({
+                title: String(a.title ?? ""),
+                apparatus: String(a.apparatus ?? ""),
+                area: String(a.area ?? ""),
+                rating: String(a.rating ?? ""),
+                photo_url: String(a.photo_url ?? ""),
+                activity_time: jam(a.activity_time),
+                notes: String(a.notes ?? ""),
+                work_location: String(a.work_location ?? ""),
+                work_mode: String(a.work_mode ?? ""),
+              }))
+            : [{ ...emptyActivity }]
+        );
+        const gallery = ((d.photos || []) as Array<Record<string, unknown>>).map((p) => String(p.photo_url ?? ""));
+        setPhotoUrls(gallery.length > 0 ? gallery : [""]);
+      })
+      .catch(() => setError("Laporan tidak bisa dimuat."));
+
+    void Promise.all([metaTask, childTask, reportTask]).then(() => setSiap(true));
   }, []);
+
+  // Simpanan lokal: bila sesi putus di tengah pengisian, isi terakhir tidak hilang.
+  useEffect(() => {
+    if (!siap) return;
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(kunciDraf, JSON.stringify({ form, activities, photoUrls }));
+        setSimpanTerakhir(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }));
+      } catch {
+        /* kuota penuh: abaikan, jangan ganggu pengisian */
+      }
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [form, activities, photoUrls, siap, kunciDraf]);
+
+  // Pulihkan simpanan lokal setelah data server selesai dimuat.
+  useEffect(() => {
+    if (!siap) return;
+    try {
+      const simpan = localStorage.getItem(kunciDraf);
+      if (!simpan) return;
+      const isi = JSON.parse(simpan) as { form?: Record<string, string>; activities?: typeof activities; photoUrls?: string[] };
+      if (isi.form) setForm((p) => ({ ...p, ...isi.form }));
+      if (isi.activities?.length) setActivities(isi.activities);
+      if (isi.photoUrls?.length) setPhotoUrls(isi.photoUrls);
+      setDipulihkan(true);
+    } catch {
+      /* simpanan rusak: abaikan */
+    }
+  }, [siap, kunciDraf]);
 
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
   const classesFor = meta.classes.filter((c) => !form.branch_id || c.branch_id === form.branch_id);
@@ -38,8 +160,29 @@ export default function BuatDailyReportPage() {
   const childName = children.find((c) => c.id === form.child_id)?.full_name || "";
   const timeline = activities.filter((a) => a.title || a.activity_time).slice().sort((a, b) => (a.activity_time || "99").localeCompare(b.activity_time || "99"));
 
+  const syarat = useMemo(
+    () => cekSyaratLokal({ lead_facilitator_id: form.lead_facilitator_id, activities, photoUrls }),
+    [form.lead_facilitator_id, activities, photoUrls]
+  );
+
   const setActivity = (i: number, patch: Partial<Activity>) =>
     setActivities((prev) => prev.map((a, idx) => (idx === i ? { ...a, ...patch } : a)));
+
+  async function unggahFoto(files: FileList | null, target: { kind: "galeri" } | { kind: "aktivitas"; index: number }) {
+    if (!files || files.length === 0) return;
+    for (const file of Array.from(files)) {
+      const url = await upload.unggah(file);
+      if (!url) return;
+      if (target.kind === "galeri") {
+        setPhotoUrls((prev) => {
+          const isi = prev.filter(Boolean);
+          return [...isi, url];
+        });
+      } else {
+        setActivity(target.index, { photo_url: url });
+      }
+    }
+  }
 
   async function submit(submitForReview: boolean) {
     setResult(null);
@@ -48,31 +191,109 @@ export default function BuatDailyReportPage() {
       return;
     }
     setSaving(true);
-    const res = await fetch("/api/daily-reports", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...form,
-        toilet_pee_count: Number(form.toilet_pee_count || 0),
-        toilet_poop_count: Number(form.toilet_poop_count || 0),
-        submit: submitForReview,
-        activities: activities.filter((a) => a.title).map((a) => ({ ...a, rating: Number(a.rating || 0) })),
-        photo_urls: photoUrls.filter(Boolean),
-      }),
-    });
-    const data = await res.json();
-    setSaving(false);
-    setResult(
-      data.ok
-        ? { ok: true, message: submitForReview ? "Laporan tersimpan dan terkirim untuk review." : "Draft laporan tersimpan." }
-        : { ok: false, message: data.error || "Gagal menyimpan laporan." }
+    const payload = {
+      ...form,
+      toilet_pee_count: Number(form.toilet_pee_count || 0),
+      toilet_poop_count: Number(form.toilet_poop_count || 0),
+      submit: submitForReview,
+      circle_rating: Number(form.circle_rating || 0),
+      activities: activities.filter((a) => a.title).map((a) => ({ ...a, rating: Number(a.rating || 0) })),
+      photo_urls: photoUrls.filter(Boolean),
+    };
+    try {
+      const res = reportId
+        ? await fetch(`/api/daily-reports/${reportId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : await fetch("/api/daily-reports", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+      if (res.status === 401) {
+        // Sesi berakhir: isi sudah aman di simpanan lokal, kembali ke editor setelah login.
+        window.location.href = `/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+        return;
+      }
+      const data = await res.json();
+
+      if (data.ok) {
+        try {
+          localStorage.removeItem(kunciDraf);
+        } catch {
+          /* abaikan */
+        }
+      }
+
+      if (data.ok) {
+        if (data.status === "menunggu_review") {
+          setResult({ ok: true, message: "Laporan tersimpan dan terkirim untuk review." });
+          window.location.href = `/daily-reports/${reportId || data.id}`;
+          return;
+        }
+        if (reportId) {
+          window.location.href = `/daily-reports/${reportId}`;
+          return;
+        }
+        // Laporan baru: simpan id supaya klik berikutnya memperbarui, bukan menggandakan.
+        setReportId(data.id);
+        setResult({ ok: true, message: "Draft laporan tersimpan. Buka daftar untuk mengirimnya ke review." });
+        return;
+      }
+
+      const kurang: string[] = Array.isArray(data.kurang) ? data.kurang : [];
+      setResult({
+        ok: false,
+        message: [data.error || "Gagal menyimpan laporan.", ...kurang.map((k) => `• ${k}`)].join("\n"),
+        existingId: typeof data.existing_id === "string" ? data.existing_id : undefined,
+      });
+    } catch {
+      setResult({ ok: false, message: "Koneksi terputus. Laporan belum tersimpan — coba lagi." });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!siap) {
+    return (
+      <>
+        <PageHead title={reportId ? "Edit Daily Report" : "Buat Daily Report"} subtitle="Memuat data laporan…" />
+        <div className="card" aria-busy="true">
+          <p className="muted">Memuat data laporan…</p>
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} style={{ height: 16, borderRadius: 4, background: "#eceff3", margin: "10px 0", width: `${70 - i * 8}%` }} />
+          ))}
+        </div>
+      </>
     );
   }
 
   return (
     <>
-      <PageHead title="Buat Daily Report" subtitle="Catat kegiatan, perkembangan, dan kondisi anak didik hari ini" />
+      <PageHead
+        title={reportId ? "Edit Daily Report" : "Buat Daily Report"}
+        subtitle={reportId ? "Perbaiki isi draft/revisi lalu simpan atau kirim untuk review" : "Catat kegiatan, perkembangan, dan kondisi anak didik hari ini"}
+        action={
+          <span className="muted" aria-live="polite" style={{ fontSize: 12 }}>
+            {simpanTerakhir ? `Tersimpan di perangkat pukul ${simpanTerakhir}` : "Menyimpan…"}
+          </span>
+        }
+      />
+      {dipulihkan ? (
+        <p className="notice" role="status">Isi terakhir dipulihkan dari simpanan di perangkat ini.</p>
+      ) : null}
+      {statusLaporan === "menunggu_review" ? (
+        <p className="notice" role="status">
+          Laporan ini sedang menunggu review. Guru masih boleh memperbaiki isinya — setiap perubahan tercatat di Jejak Audit.
+        </p>
+      ) : null}
       {error ? <ErrorState message={error} /> : null}
+      {dipulihkan ? (
+        <p className="notice" role="status">Isi terakhir dipulihkan dari simpanan di perangkat ini (sesi sempat terputus).</p>
+      ) : null}
+      {upload.error ? <div className="alert alert-error" role="alert">{upload.error}</div> : null}
       <form onSubmit={(e) => e.preventDefault()}>
         <div className="editor-grid">
           <div className="card">
@@ -98,7 +319,7 @@ export default function BuatDailyReportPage() {
             <h2 style={{ marginTop: 22 }}>2. Tidur &amp; Istirahat</h2>
             <div className="form-grid">
               <div className="field"><label>Kualitas Tidur</label><div className="choice-row">{NAP.map(([v, label]) => (<button type="button" key={v} className={form.nap_quality === v ? "choice selected" : "choice"} onClick={() => set("nap_quality", v)} aria-pressed={form.nap_quality === v}>{label}</button>))}</div></div>
-              <div className="field"><label>Jam Tidur</label><div className="row"><input type="time" aria-label="Mulai tidur" value={form.nap_start || ""} onChange={(e) => set("nap_start", e.target.value)} /><input type="time" aria-label="Selesai tidur" value={form.nap_end || ""} onChange={(e) => set("nap_end", e.target.value)} /></div></div>
+              <div className="field"><label>Jam Tidur</label><div className="row"><TimeInput label="Mulai tidur" value={form.nap_start || ""} onChange={(v) => set("nap_start", v)} /><TimeInput label="Selesai tidur" value={form.nap_end || ""} onChange={(v) => set("nap_end", v)} /></div></div>
             </div>
 
             <h2 style={{ marginTop: 22 }}>3. Toilet Training</h2>
@@ -119,35 +340,75 @@ export default function BuatDailyReportPage() {
                 <div className="row spread"><strong>Aktivitas {i + 1}</strong>{activities.length > 1 ? <button type="button" className="btn small danger" onClick={() => setActivities(activities.filter((_, idx) => idx !== i))}>Hapus</button> : null}</div>
                 <div className="form-grid" style={{ marginTop: 8 }}>
                   <div className="field"><label>Judul Aktivitas</label><input placeholder="Mengenal warna dan bentuk" value={a.title} onChange={(e) => setActivity(i, { title: e.target.value })} /></div>
-                  <div className="field"><label>Jam</label><input type="time" value={a.activity_time} onChange={(e) => setActivity(i, { activity_time: e.target.value })} /></div>
+                  <div className="field"><label>Jam</label><TimeInput value={a.activity_time} label={`Jam aktivitas ${i + 1}`} onChange={(v) => setActivity(i, { activity_time: v })} /></div>
                   <div className="field"><label>Aparatus (syarat terbit)</label><input placeholder="Kartu warna Montessori" value={a.apparatus} onChange={(e) => setActivity(i, { apparatus: e.target.value })} /></div>
-                  <div className="field"><label>Rating 1-5 (syarat terbit)</label><input type="number" min="1" max="5" value={a.rating} onChange={(e) => setActivity(i, { rating: e.target.value })} /></div>
-                  <div className="field"><label>URL Foto Aktivitas</label><input placeholder="https://..." value={a.photo_url} onChange={(e) => setActivity(i, { photo_url: e.target.value })} /></div>
+                  <div className="field"><label>Rating 1–4 Bintang (syarat terbit)</label><input type="number" min="1" max="4" value={a.rating} onChange={(e) => setActivity(i, { rating: e.target.value })} /></div>
+                  <div className="field"><label>Area Montessori</label><select value={a.area} onChange={(e) => setActivity(i, { area: e.target.value })}><option value="">Pilih area</option>{AREA_OPSI.map(([v, label]) => (<option key={v} value={v}>{label}</option>))}</select></div>
+                  <div className="field"><label>Lokasi Kerja</label><select value={a.work_location} onChange={(e) => setActivity(i, { work_location: e.target.value })}><option value="">Pilih lokasi</option>{LOKASI_OPSI.map(([v, label]) => (<option key={v} value={v}>{label}</option>))}</select></div>
+                  <div className="field"><label>Mode Kerja</label><select value={a.work_mode} onChange={(e) => setActivity(i, { work_mode: e.target.value })}><option value="">Pilih mode</option>{MODE_OPSI.map(([v, label]) => (<option key={v} value={v}>{label}</option>))}</select></div>
+                  <div className="field">
+                    <label>Foto Aktivitas</label>
+                    <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => void unggahFoto(e.target.files, { kind: "aktivitas", index: i })} />
+                    {a.photo_url ? (
+                      <a href={a.photo_url} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>Lihat foto</a>
+                    ) : null}
+                  </div>
                   <div className="field"><label>Catatan Aktivitas</label><input value={a.notes} onChange={(e) => setActivity(i, { notes: e.target.value })} /></div>
                 </div>
               </div>
             ))}
             <button type="button" className="btn secondary small" onClick={() => setActivities([...activities, { ...emptyActivity }])}>+ Tambah Aktivitas</button>
 
-            <h2 style={{ marginTop: 22 }}>6. Foto &amp; Video</h2>
-            {photoUrls.map((url, i) => (
-              <div className="field" key={i} style={{ marginBottom: 8 }}>
-                <label>URL Foto Galeri {i + 1}</label>
-                <input placeholder="https://..." value={url} onChange={(e) => setPhotoUrls(photoUrls.map((u, idx) => (idx === i ? e.target.value : u)))} />
-              </div>
-            ))}
-            <button type="button" className="btn secondary small" onClick={() => setPhotoUrls([...photoUrls, ""])}>+ Tambah Foto</button>
-            <p className="hint muted">Unggah berkas sungguhan memerlukan storage (S3/R2) yang belum dikonfigurasi di paket ini; dokumentasi dicatat sebagai URL media.</p>
+            <h2 style={{ marginTop: 22 }}>6. Circle Time</h2>
+            <div className="form-grid">
+              <div className="field"><label htmlFor="circle_theme">Tema Circle Time</label><input id="circle_theme" placeholder="Profesi dan Cita-cita" value={form.circle_theme || ""} onChange={(e) => set("circle_theme", e.target.value)} /></div>
+              <div className="field"><label htmlFor="circle_rating">Rating Circle Time (1–4)</label><input id="circle_rating" type="number" min="1" max="4" value={form.circle_rating || ""} onChange={(e) => set("circle_rating", e.target.value)} /></div>
+              <div className="field"><label htmlFor="circle_notes">Catatan Circle Time</label><input id="circle_notes" value={form.circle_notes || ""} onChange={(e) => set("circle_notes", e.target.value)} /></div>
+            </div>
 
-            <h2 style={{ marginTop: 22 }}>7. Catatan Tambahan</h2>
+            <h2 style={{ marginTop: 22 }}>7. Moment Special &amp; Saran di Rumah</h2>
+            <div className="form-grid">
+              <div className="field"><label htmlFor="special_moment">Moment Special</label><textarea id="special_moment" rows={2} placeholder="Kosongkan bila tidak ada kejadian spesifik hari ini" value={form.special_moment || ""} onChange={(e) => set("special_moment", e.target.value)} /></div>
+              <div className="field"><label htmlFor="home_suggestion">Saran di Rumah</label><textarea id="home_suggestion" rows={2} value={form.home_suggestion || ""} onChange={(e) => set("home_suggestion", e.target.value)} /></div>
+            </div>
+
+            <h2 style={{ marginTop: 22 }}>8. Foto &amp; Video</h2>
+            <div className="field">
+              <label htmlFor="foto-galeri">Unggah foto (JPG/PNG/WEBP, maks 5 MB)</label>
+              <input id="foto-galeri" type="file" multiple accept="image/jpeg,image/png,image/webp" disabled={upload.uploading} onChange={(e) => void unggahFoto(e.target.files, { kind: "galeri" })} />
+              {upload.uploading ? <span className="muted" style={{ fontSize: 12 }}>Mengunggah…</span> : null}
+            </div>
+            {photoUrls.filter(Boolean).length === 0 ? (
+              <p className="muted">Belum ada foto.</p>
+            ) : (
+              <ul style={{ listStyle: "none", padding: 0, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {photoUrls.filter(Boolean).map((url, i) => (
+                  <li key={url} style={{ border: "1px solid #e3e7ee", borderRadius: 8, padding: 6 }}>
+                    <a href={url} target="_blank" rel="noreferrer">
+                      <img src={url} alt={`Foto ${i + 1}`} width={96} height={96} style={{ objectFit: "cover", borderRadius: 4, display: "block" }} />
+                    </a>
+                    <button type="button" className="btn small danger" style={{ marginTop: 6, width: "100%" }} onClick={() => setPhotoUrls((prev) => prev.filter((u) => u !== url))}>
+                      Hapus
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <h2 style={{ marginTop: 22 }}>9. Catatan Tambahan</h2>
             <div className="field"><label htmlFor="notes">Catatan Guru</label><textarea id="notes" rows={3} value={form.notes || ""} onChange={(e) => set("notes", e.target.value)} /></div>
 
-            {result ? <p className={result.ok ? "success" : "notice"} role="status" style={{ marginTop: 16 }}>{result.message} {result.ok ? <Link href="/daily-reports">Lihat daftar laporan</Link> : null}</p> : null}
+            {result ? <p className={result.ok ? "success" : "notice"} role="status" style={{ marginTop: 16, whiteSpace: "pre-line" }}>{result.message} {result.ok ? <Link href="/daily-reports">Lihat daftar laporan</Link> : null}{result.existingId ? <> · <Link href={`/daily-reports/${result.existingId}`}>Buka laporan itu</Link></> : null}</p> : null}
             <div className="row" style={{ marginTop: 18 }}>
               <Link className="btn secondary" href="/daily-reports">Batal</Link>
-              <button type="button" className="btn secondary" disabled={saving} onClick={() => submit(false)}>Simpan sebagai Draft</button>
-              <button type="button" className="btn" disabled={saving} onClick={() => submit(true)}>{saving ? "Menyimpan..." : "Simpan & Kirim untuk Review"}</button>
+              <button type="button" className="btn secondary" disabled={saving || upload.uploading || !siap} onClick={() => submit(false)}>Simpan sebagai Draft</button>
+              <button type="button" className="btn" disabled={saving || upload.uploading || !siap} onClick={() => submit(true)}>{saving ? "Menyimpan…" : "Simpan & Kirim untuk Review"}</button>
             </div>
+            {!syarat.ok && !saving ? (
+              <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                Syarat terbit belum lengkap — tombol kirim akan menampilkan daftar kekurangannya.
+              </p>
+            ) : null}
           </div>
 
           <aside>
@@ -165,7 +426,7 @@ export default function BuatDailyReportPage() {
               <h3 style={{ marginTop: 16 }}>Ringkasan</h3>
               <p className="muted" style={{ margin: 0 }}>
                 Anak: <strong>{childName || "-"}</strong><br />
-                Tanggal: {form.report_date}<br />
+                Tanggal: {form.report_date ? tanggalPanjang(form.report_date) : "-"}<br />
                 Mood: {MOODS.find(([v]) => v === form.mood)?.[1] || "-"}<br />
                 Aktivitas terisi: {activities.filter((a) => a.title).length} · Foto galeri: {photoUrls.filter(Boolean).length}
               </p>
@@ -180,6 +441,7 @@ export default function BuatDailyReportPage() {
               <div className="signature" aria-label="Tanda tangan guru pembuat">{teacherName || "Nama guru pembuat"}</div>
               <p className="muted" style={{ margin: "6px 0 0" }}>{teacherName || "Pilih guru pembuat untuk menandatangani laporan ini."}</p>
             </div>
+            <SyaratChecklist state={syarat.state} />
           </aside>
         </div>
       </form>

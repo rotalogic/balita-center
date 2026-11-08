@@ -1,12 +1,32 @@
 import { NextResponse } from "next/server";
 import { dbErrorMessage, query } from "@/lib/db";
+import { branchScope, guard } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const denied = await guard("students.view");
+  if (denied.error) return denied.error;
   try {
     const { searchParams } = new URL(request.url);
     const q = (searchParams.get("q") || "").trim();
+    const scope = branchScope(denied.user);
+    // Sampah: hanya Super Admin.
+    if (searchParams.get("trash") === "1") {
+      if (!denied.user.roles.includes("super_admin")) {
+        return NextResponse.json({ ok: false, error: "Sampah hanya untuk Super Admin." }, { status: 403 });
+      }
+      const sampah = await query(
+        `SELECT c.id, c.full_name, c.deleted_at, c.deleted_reason, b.name AS branch_name,
+                u.full_name AS oleh
+           FROM children c
+           JOIN branches b ON b.id = c.branch_id
+           LEFT JOIN users u ON u.id = c.deleted_by
+          WHERE c.deleted_at IS NOT NULL
+          ORDER BY c.deleted_at DESC LIMIT 200`
+      );
+      return NextResponse.json({ ok: true, children: sampah, trash: true });
+    }
     const rows = await query(
       `SELECT c.id, c.full_name, c.nickname, c.birth_date, c.gender, c.status, c.photo_url,
               b.name AS branch_name,
@@ -17,9 +37,10 @@ export async function GET(request: Request) {
          FROM children c
          JOIN branches b ON b.id = c.branch_id
         WHERE c.deleted_at IS NULL AND ($1 = '' OR c.full_name ILIKE '%' || $1 || '%')
+          AND ($2::uuid[] IS NULL OR c.branch_id = ANY($2::uuid[]))
         ORDER BY c.full_name
         LIMIT 200`,
-      [q]
+      [q, scope]
     );
     return NextResponse.json({ ok: true, children: rows });
   } catch (error) {
@@ -28,6 +49,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const denied = await guard("students.create");
+  if (denied.error) return denied.error;
   try {
     const body = (await request.json()) as Record<string, string>;
     const required = ["branch_id", "full_name", "class_id", "program_id"];
@@ -39,8 +62,8 @@ export async function POST(request: Request) {
     const childRows = await query(
       `INSERT INTO children (branch_id, full_name, nickname, birth_date, gender, birth_place, religion,
                              blood_type, health_notes, special_needs, languages, hobbies,
-                             transport_mode, photo_consent, enrolled_on)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+                             transport_mode, photo_consent, photo_url, enrolled_on)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
        RETURNING id`,
       [
         body.branch_id,
@@ -57,6 +80,8 @@ export async function POST(request: Request) {
         body.hobbies || null,
         body.transport_mode || null,
         body.photo_consent === "true",
+        // Hanya terima URL internal hasil unggahan — cegah javascript:/remote URL.
+        body.photo_url && body.photo_url.startsWith("/api/files/") ? body.photo_url : null,
         body.enrolled_on || null,
       ]
     );
@@ -88,6 +113,17 @@ export async function POST(request: Request) {
        VALUES ($1,$2,$3,$4, COALESCE($5::date, CURRENT_DATE), 'aktif')`,
       [body.branch_id, childId, body.class_id, body.program_id, body.enrolled_on || null]
     );
+
+    // Bila anak ini berasal dari pipeline Admission, tutup lead-nya.
+    if (body.lead_id) {
+      await query(
+        `UPDATE leads
+            SET stage = 'terdaftar', bot_status = 'terdaftar',
+                converted_child_id = $1, updated_at = now()
+          WHERE id = $2`,
+        [childId, body.lead_id]
+      );
+    }
 
     return NextResponse.json({ ok: true, id: childId });
   } catch (error) {

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { EmptyState, ErrorState, LoadingState, PageHead, StatusBadge } from "@/components/chrome";
+import { tanggalPanjang } from "@/lib/format";
 
 type Row = Record<string, string | number | null>;
 type Payload = {
@@ -17,6 +18,15 @@ type Payload = {
 };
 
 const TABS = ["Profil Anak", "Pendidikan & STPPA", "Kesehatan", "Laporan & Perkembangan"] as const;
+const LABEL_GENDER: Record<string, string> = {
+  laki_laki: "Laki-laki",
+  perempuan: "Perempuan",
+};
+const labelAtau = (peta: Record<string, string>, nilai: unknown) => {
+  const teks = String(nilai ?? "").trim();
+  if (!teks) return "-";
+  return peta[teks.toLowerCase()] || teks;
+};
 const ASPECTS: Array<[string, string]> = [
   ["physical_pct", "Pertumbuhan Fisik"], ["gross_motor_pct", "Motorik Kasar"], ["fine_motor_pct", "Motorik Halus"],
   ["cognitive_pct", "Kognitif"], ["language_pct", "Bahasa"], ["social_emotional_pct", "Sosial & Emosional"], ["independence_pct", "Kemandirian"],
@@ -46,7 +56,33 @@ export default function DetailAnakPage() {
       <PageHead
         title={String(child.full_name || "Detail Anak Didik")}
         subtitle="Lihat dan kelola informasi lengkap anak didik"
-        action={<Link className="btn" href="/daily-reports/buat">+ Daily Report</Link>}
+        action={
+          <div className="row" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Link className="btn secondary" href={`/anak/${params.id}/edit`}>Ubah Data</Link>
+            <Link className="btn secondary" href={`/connect?child_id=${params.id}&preview=1`} target="_blank">
+              Pratinjau sebagai Orang Tua
+            </Link>
+            <Link className="btn" href="/daily-reports/buat">+ Daily Report</Link>
+            <button
+              className="btn secondary"
+              style={{ color: "#b42318", borderColor: "#f0c4bf" }}
+              onClick={async () => {
+                const alasan = window.prompt(`Hapus (Sampah) data ${child.full_name}? Tulis alasan singkat:`);
+                if (alasan === null) return;
+                const res = await fetch(`/api/children/${params.id}/sampah`, {
+                  method: "DELETE",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ reason: alasan }),
+                });
+                const d = await res.json();
+                if (d.ok) window.location.href = "/anak";
+                else window.alert(d.error || "Gagal menghapus.");
+              }}
+            >
+              Hapus (Sampah)
+            </button>
+          </div>
+        }
       />
       <div className="tab-row" role="tablist" aria-label="Bagian detail anak">
         {TABS.map((t) => (
@@ -58,16 +94,24 @@ export default function DetailAnakPage() {
         <section className="grid three">
           <article className="card">
             <h2>Ringkasan</h2>
+            {child.photo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={String(child.photo_url)}
+                alt={String(child.full_name || "Foto anak")}
+                style={{ width: "100%", maxWidth: 180, aspectRatio: "1", objectFit: "cover", borderRadius: 12, marginBottom: 12 }}
+              />
+            ) : null}
             <p><StatusBadge status={String(child.status || "aktif")} /></p>
             <dl>
-              <dt className="muted">Tanggal lahir</dt><dd>{String(child.birth_date || "-")}</dd>
+              <dt className="muted">Tanggal lahir</dt><dd>{tanggalPanjang(child.birth_date as string)}</dd>
               <dt className="muted">Tempat lahir</dt><dd>{String(child.birth_place || "-")}</dd>
-              <dt className="muted">Jenis kelamin</dt><dd>{String(child.gender || "-")}</dd>
+              <dt className="muted">Jenis kelamin</dt><dd>{labelAtau(LABEL_GENDER, child.gender)}</dd>
               <dt className="muted">Agama</dt><dd>{String(child.religion || "-")}</dd>
               <dt className="muted">Bahasa</dt><dd>{String(child.languages || "-")}</dd>
               <dt className="muted">Hobi / minat</dt><dd>{String(child.hobbies || "-")}</dd>
               <dt className="muted">Transportasi</dt><dd>{String(child.transport_mode || "-")}</dd>
-              <dt className="muted">Tanggal masuk</dt><dd>{String(child.enrolled_on || "-")}</dd>
+              <dt className="muted">Tanggal masuk</dt><dd>{tanggalPanjang(child.enrolled_on as string)}</dd>
             </dl>
           </article>
           <article className="card">
@@ -132,7 +176,7 @@ export default function DetailAnakPage() {
           <article className="card">
             <h2>Riwayat Pemeriksaan</h2>
             {data.health.length === 0 ? (
-              <EmptyState title="Belum ada pemeriksaan" body="Pemeriksaan dari tabel health_checks tampil di sini setelah dicatat." />
+              <EmptyState title="Belum ada pemeriksaan" body="Catatan pemeriksaan kesehatan anak tampil di sini setelah ditambahkan guru atau tenaga kesehatan." />
             ) : (
               <ul className="timeline">
                 {data.health.map((h) => (

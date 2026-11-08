@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbErrorMessage, query } from "@/lib/db";
+import { guard } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,8 @@ const ALLOWED = new Set([
 ]);
 
 export async function GET(request: Request) {
+  const denied = await guard("dashboard.view");
+  if (denied.error) return denied.error;
   try {
     const { searchParams } = new URL(request.url);
     const requested = (searchParams.get("tables") || "")

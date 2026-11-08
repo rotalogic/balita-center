@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { dbErrorMessage, query } from "@/lib/db";
+import { guard } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
 
 // Data master minimum agar aplikasi bisa dipakai dari database kosong:
 // cabang, program, kelas, dan staf dibuat lewat endpoint ini (formulir Data Awal).
 export async function GET() {
+  const denied = await guard("dashboard.view");
+  if (denied.error) return denied.error;
   try {
     const [branches, programs, classes, staff] = await Promise.all([
       query("SELECT id, code, name FROM branches WHERE deleted_at IS NULL ORDER BY name"),
@@ -20,6 +23,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const denied = await guard("branches.manage");
+  if (denied.error) return denied.error;
   try {
     const body = (await request.json()) as Record<string, string>;
     const kind = body.kind;

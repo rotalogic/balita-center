@@ -1,5 +1,7 @@
 "use client";
 
+import { tanggalPanjang } from "@/lib/format";
+
 import { EmptyState, ErrorState, LoadingState, PageHead } from "@/components/chrome";
 import { useConnect } from "@/lib/use-connect";
 
@@ -24,7 +26,7 @@ export default function ConnectGaleriPage() {
             <figure className="gallery-item" key={p.id} style={{ margin: 0 }}>
               {/* URL media dicatat guru pada laporan; ditampilkan apa adanya */}
               <img src={p.url} alt={p.caption} loading="lazy" />
-              <figcaption>{p.caption}{p.report_date ? ` · ${p.report_date}` : ""}</figcaption>
+              <figcaption>{p.caption}{p.report_date ? ` · ${tanggalPanjang(p.report_date)}` : ""}</figcaption>
             </figure>
           ))}
         </div>

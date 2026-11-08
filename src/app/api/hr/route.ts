@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { dbErrorMessage, query } from "@/lib/db";
+import { guard } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const denied = await guard("hr.view");
+  if (denied.error) return denied.error;
   try {
     const [staff, leaves, attendanceToday] = await Promise.all([
       query(
@@ -25,6 +28,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const denied = await guard("hr.manage");
+  if (denied.error) return denied.error;
   try {
     const body = (await request.json()) as Record<string, string>;
     if (body.action === "putuskan_cuti") {

@@ -1,5 +1,27 @@
+# Dependensi & hasil build
 node_modules/
 .next/
+out/
+build/
+dist/
+
+# Rahasia — JANGAN pernah masuk repo
+CREDENTIALS.txt
+.job_token
 .env
-.env.local
+.env.*
+*.pem
+*.key
+storage/uploads/
+data/Helvetica.afm
+
+# Berkas sistem & sampah
+.DS_Store
 *.log
+npm-debug.log*
+backup-balita/
+*.dump
+*.tar.gz
+
+# Data uji lokal
+/tmp/

@@ -9,7 +9,8 @@ type Mods = { users: AnyRow[]; rolesAgg: AnyRow[]; audit: AnyRow[] };
 export default function PengaturanPage() {
   const mods = useApi<Mods>("/api/modules");
   const counts = useApi<{ counts: Record<string, number> }>("/api/counts?tables=users,roles,permissions,audit_logs");
-  const error = mods.error || counts.error;
+  const storage = useApi<{ driver: string; label: string; peringatan: string | null; bucket: string | null }>("/api/storage");
+  const error = mods.error || counts.error || storage.error;
 
   return (
     <>
@@ -45,19 +46,26 @@ export default function PengaturanPage() {
           { key: "is_active", label: "Aktif", render: (r) => <StatusBadge status={r.is_active ? "aktif" : "revisi"} /> },
         ]}
       />
-      <DataSection
-        title="Jejak Audit Terakhir"
-        rows={mods.data ? mods.data.audit : null}
-        emptyTitle="Belum ada jejak audit"
-        emptyBody="Aksi penting yang dicatat aplikasi ke audit_logs tampil di sini."
-        columns={[
-          { key: "action", label: "Aksi" },
-          { key: "entity_table", label: "Tabel" },
-          { key: "detail", label: "Detail" },
-          { key: "created_at", label: "Waktu", render: (r) => dateFmt(r.created_at) },
-        ]}
-      />
-      <p className="notice">Login kata sandi sungguhan belum diaktifkan di paket ini; peran tampil sebagai konteks kerja berlabel di layar login, sama seperti batas yang dinyatakan pada aplikasi hosted-nya. Untuk produksi tambahkan Auth.js/NextAuth dan kaitkan user_roles + user_branches.</p>
+      <article className="card">
+        <h2 style={{ marginTop: 0 }}>Jejak Audit</h2>
+        <p style={{ margin: "0 0 10px" }}>
+          Tercatat <strong>{counts.data ? counts.data.counts.audit_logs : "…"}</strong> entri. Untuk menyelidiki siapa
+          melakukan apa, gunakan halaman Jejak Audit (jam WIB, filter aktor/aksi/entitas/tanggal, ekspor CSV).
+        </p>
+        <a className="btn" href="/audit">Buka Jejak Audit</a>
+      </article>
+      <article className="card">
+        <h2 style={{ marginTop: 0 }}>Penyimpanan Foto</h2>
+        <p style={{ margin: "0 0 6px" }}>
+          Driver aktif: <strong>{storage.data ? storage.data.driver : "..."}</strong>
+          {storage.data ? <span className="muted"> — {storage.data.label}</span> : null}
+        </p>
+        <p className={storage.data?.driver === "lokal" ? "notice" : "muted"} style={{ margin: 0 }}>
+          {storage.data?.peringatan ||
+            "Foto disimpan di object storage (S3/R2). Verifikasi dengan mengunggah satu foto di Daily Report lalu membukanya kembali."}
+        </p>
+      </article>
+      <p className="success">Login kata sandi aktif (scrypt), sesi cookie httpOnly, RBAC ditegakkan di server pada setiap API, dan pendaftaran baru menunggu persetujuan Super Admin. Kata sandi bisa direset lewat tautan sekali pakai dari menu Pengguna, serta 2FA TOTP tersedia di halaman Akun.</p>
     </>
   );
 }

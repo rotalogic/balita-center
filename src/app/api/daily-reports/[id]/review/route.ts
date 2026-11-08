@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbErrorMessage, query } from "@/lib/db";
+import { guard } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,8 @@ export const dynamic = "force-dynamic";
 // laporan yang syaratnya belum lengkap ditolak PostgreSQL dan pesannya
 // diteruskan ke pengguna apa adanya.
 export async function POST(request: Request, { params }: { params: { id: string } }) {
+  const denied = await guard("daily_reports.review");
+  if (denied.error) return denied.error;
   try {
     const body = (await request.json()) as { action: string; reviewer_id: string; notes?: string };
     const actionMap: Record<string, { status: string; reviewAction: string }> = {

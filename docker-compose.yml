@@ -12,6 +12,7 @@ services:
       - balita_pgdata:/var/lib/postgresql/data
       # File SQL dijalankan otomatis HANYA saat volume data masih kosong (pertama kali).
       - ./database/balita-center-database.sql:/docker-entrypoint-initdb.d/01-balita.sql:ro
+      - ./database/02-migrasi-dan-seed.sql:/docker-entrypoint-initdb.d/02-migrasi.sql:ro
     ports:
       - "54329:5432"
 
@@ -22,6 +23,8 @@ services:
       - db
     environment:
       DATABASE_URL: postgres://balita:ganti-kata-sandi-ini@db:5432/balita_center
+      AUTH_SECRET: ganti-dengan-teks-acak-panjang-untuk-lokal
+      APP_BASE_URL: http://localhost:3000
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
     ports:

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { EmptyState, ErrorState, LoadingState, PageHead, StatusBadge } from "@/components/chrome";
-import { useConnect } from "@/lib/use-connect";
+import { konteksConnect, useConnect } from "@/lib/use-connect";
 
 export default function ConnectKegiatanPage() {
   const { data, error, reload } = useConnect();
@@ -12,13 +12,19 @@ export default function ConnectKegiatanPage() {
   if (error) return (<><PageHead title="Kalender Kegiatan" /><ErrorState message={error} /></>);
   if (!data) return (<><PageHead title="Kalender Kegiatan" /><LoadingState /></>);
 
+  const { preview } = konteksConnect();
+
   async function rsvp(eventId: string, response: "hadir" | "tidak_hadir") {
     if (!data?.child) return;
+    if (preview) {
+      setFeedback({ [eventId]: "Mode pratinjau hanya baca — konfirmasi tidak dikirim." });
+      return;
+    }
     setBusy(eventId + response);
     const res = await fetch("/api/connect", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "rsvp", child_id: data.child.id, event_id: eventId, response }),
+      body: JSON.stringify({ kind: "rsvp", child_id: data.child.id, event_id: eventId, response, preview }),
     });
     const result = await res.json();
     setBusy(null);

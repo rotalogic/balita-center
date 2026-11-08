@@ -1,0 +1,49 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { bacaSession, signSession, SESI_IDLE_DETIK } from "@/lib/session";
+
+// Rute publik: halaman auth + endpoint auth.
+const PUBLIC_PAGES = ["/login", "/register", "/forgot", "/reset"];
+
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // /api/whatsapp/webhook diautentikasi oleh tanda tangan Meta (X-Hub-Signature-256),
+  // bukan sesi pengguna — jadi harus lolos dari middleware.
+  const publicApi = pathname.startsWith("/api/auth/") || pathname.startsWith("/api/whatsapp/") || pathname === "/api/health";
+  if (PUBLIC_PAGES.includes(pathname) || publicApi) {
+    return NextResponse.next();
+  }
+
+  const sesi = await bacaSession(request.cookies.get("sess")?.value);
+  if (sesi) {
+    const resp = NextResponse.next();
+    // Perpanjangan meluncur: setiap permintaan sah memperbarui batas idle 8 jam,
+    // batas absolut 7 hari tetap dipegang dari token lama.
+    const sisa = sesi.exp - Math.floor(Date.now() / 1000);
+    if (sisa < SESI_IDLE_DETIK - 60) {
+      resp.cookies.set("sess", await signSession(sesi.userId, SESI_IDLE_DETIK, sesi.abs), {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        maxAge: SESI_IDLE_DETIK,
+      });
+    }
+    return resp;
+  }
+
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.json({ ok: false, error: "Belum masuk. Silakan login." }, { status: 401 });
+  }
+
+  const url = request.nextUrl.clone();
+  url.pathname = "/login";
+  // Bawa URL lengkap (termasuk ?id=…) supaya pengguna kembali ke editor yang sama.
+  const tujuan = `${pathname}${request.nextUrl.search || ""}`;
+  url.search = pathname === "/" ? "" : `?next=${encodeURIComponent(tujuan)}`;
+  url.search += `${url.search ? "&" : "?"}sesi=berakhir`;
+  return NextResponse.redirect(url);
+}
+
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+};

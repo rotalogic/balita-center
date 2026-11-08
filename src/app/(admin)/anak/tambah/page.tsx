@@ -32,7 +32,49 @@ export default function TambahAnakPage() {
   };
   useEffect(loadMeta, []);
 
+  // Mode dari pipeline Admission: /anak/tambah?lead=<id>
+  useEffect(() => {
+    const leadId = new URLSearchParams(window.location.search).get("lead");
+    if (!leadId) return;
+    fetch("/api/admission")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.ok) return;
+        const lead = (d.leads || []).find((item: { id: string }) => item.id === leadId);
+        if (!lead) return;
+        setForm((prev) => ({
+          ...prev,
+          lead_id: lead.id,
+          branch_id: lead.branch_id || prev.branch_id || "",
+          full_name: lead.child_name || "",
+          guardian_name: lead.parent_name || "",
+          guardian_phone: lead.wa_number || "",
+        }));
+      })
+      .catch(() => null);
+  }, []);
+
   const set = (key: string, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
+  const [uploading, setUploading] = useState(false);
+
+  async function uploadPhoto(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setResult(null);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body });
+      const data = await res.json();
+      if (data.ok) set("photo_url", data.url);
+      else setResult({ ok: false, message: data.error || "Gagal mengunggah foto." });
+    } catch {
+      setResult({ ok: false, message: "Gagal mengunggah foto." });
+    } finally {
+      setUploading(false);
+    }
+  }
   const classesFor = meta.classes.filter(
     (c) => (!form.branch_id || c.branch_id === form.branch_id) && (!form.program_id || c.program_id === form.program_id)
   );
@@ -188,12 +230,29 @@ export default function TambahAnakPage() {
           <>
             <h2>3. Data Tambahan &amp; Kesehatan</h2>
             <div className="form-grid">
-              <div className="field"><label htmlFor="blood_type">Golongan Darah</label><input id="blood_type" placeholder="O+" value={form.blood_type || ""} onChange={(e) => set("blood_type", e.target.value)} /></div>
+              <div className="field"><label htmlFor="blood_type">Golongan Darah</label>
+                <select id="blood_type" value={form.blood_type || ""} onChange={(e) => set("blood_type", e.target.value)}>
+                  <option value="">Belum diisi</option>
+                  {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((g) => (<option key={g} value={g}>{g}</option>))}
+                </select>
+                <span className="hint">Kosongkan bila belum diketahui — jangan diisi asal.</span></div>
               <div className="field"><label htmlFor="special_needs">Kebutuhan Khusus</label><input id="special_needs" placeholder="Tidak ada" value={form.special_needs || ""} onChange={(e) => set("special_needs", e.target.value)} /></div>
               <div className="field"><label htmlFor="languages">Bahasa yang Dikuasai</label><input id="languages" value={form.languages || ""} onChange={(e) => set("languages", e.target.value)} /></div>
               <div className="field"><label htmlFor="hobbies">Hobi / Minat</label><input id="hobbies" value={form.hobbies || ""} onChange={(e) => set("hobbies", e.target.value)} /></div>
               <div className="field"><label htmlFor="transport_mode">Transportasi</label><input id="transport_mode" placeholder="Diantar Orang Tua" value={form.transport_mode || ""} onChange={(e) => set("transport_mode", e.target.value)} /></div>
               <div className="field"><label htmlFor="health_notes">Catatan Kesehatan / Alergi</label><input id="health_notes" value={form.health_notes || ""} onChange={(e) => set("health_notes", e.target.value)} /></div>
+              <div className="field">
+                <label htmlFor="photo_file">Foto Anak</label>
+                <input id="photo_file" type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} disabled={uploading} />
+                <span className="hint">{uploading ? "Mengunggah…" : "JPG/PNG/WEBP, maks 5 MB."}</span>
+                {form.photo_url ? (
+                  <div style={{ marginTop: 8, display: "flex", gap: 10, alignItems: "center" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={form.photo_url} alt="Foto anak" style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 10 }} />
+                    <button type="button" className="btn small secondary" onClick={() => set("photo_url", "")}>Hapus foto</button>
+                  </div>
+                ) : null}
+              </div>
               <div className="field"><label>Perbolehan Foto &amp; Video</label><div className="choice-row">{[["true", "Diizinkan"], ["false", "Tidak diizinkan"]].map(([v, label]) => (<button type="button" key={v} className={form.photo_consent === v ? "choice selected" : "choice"} onClick={() => set("photo_consent", v)} aria-pressed={form.photo_consent === v}>{label}</button>))}</div></div>
             </div>
           </>
@@ -210,9 +269,9 @@ export default function TambahAnakPage() {
               {className ? <> · Kelas {className}</> : null}
             </div>
             <div className="form-grid">
-              <div className="field"><label htmlFor="branch_id">Cabang *</label><select id="branch_id" value={form.branch_id || ""} onChange={(e) => set("branch_id", e.target.value)} required><option value="">Pilih cabang</option>{meta.branches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}</select>{errors.branch_id ? <span className="err">{errors.branch_id}</span> : null}</div>
-              <div className="field"><label htmlFor="program_id">Program *</label><select id="program_id" value={form.program_id || ""} onChange={(e) => set("program_id", e.target.value)} required><option value="">Pilih program</option>{meta.programs.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}</select>{errors.program_id ? <span className="err">{errors.program_id}</span> : null}</div>
-              <div className="field"><label htmlFor="class_id">Kelas yang Dituju *</label><select id="class_id" value={form.class_id || ""} onChange={(e) => set("class_id", e.target.value)} required><option value="">Pilih kelas</option>{classesFor.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}</select>{errors.class_id ? <span className="err">{errors.class_id}</span> : null}</div>
+              <div className="field"><label htmlFor="branch_id">Cabang *</label><select id="branch_id" value={form.branch_id || ""} onChange={(e) => { set("branch_id", e.target.value); set("class_id", ""); }} required><option value="">Pilih cabang</option>{meta.branches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}</select>{errors.branch_id ? <span className="err">{errors.branch_id}</span> : null}</div>
+              <div className="field"><label htmlFor="program_id">Program *</label><select id="program_id" value={form.program_id || ""} onChange={(e) => { set("program_id", e.target.value); set("class_id", ""); }} required><option value="">Pilih program</option>{meta.programs.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}</select>{errors.program_id ? <span className="err">{errors.program_id}</span> : null}</div>
+              <div className="field"><label htmlFor="class_id">Kelas yang Dituju *</label><select id="class_id" value={form.class_id || ""} onChange={(e) => set("class_id", e.target.value)} required><option value="">Pilih kelas</option>{classesFor.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}</select>{classesFor.length === 0 ? (<span className="hint">Belum ada kelas untuk cabang &amp; program ini. Buat dulu di panel <strong>Data Awal</strong> di atas.</span>) : null}{errors.class_id ? <span className="err">{errors.class_id}</span> : null}</div>
               <div className="field"><label htmlFor="enrolled_on">Tanggal Masuk</label><input id="enrolled_on" type="date" value={form.enrolled_on || ""} onChange={(e) => set("enrolled_on", e.target.value)} /></div>
             </div>
           </>

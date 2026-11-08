@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { dbErrorMessage, query } from "@/lib/db";
+import { guard } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
 
 // Satu endpoint baca untuk halaman modul: admission, cabang, investor,
 // komunikasi, pengaturan, akademik, dan laporan. Semua dibaca dari tabel asli.
 export async function GET() {
+  const denied = await guard("dashboard.view");
+  if (denied.error) return denied.error;
   try {
     const [leads, registrations, branchesAgg, cashAgg, messages, announcements, users, rolesAgg, audit, cycles, attendanceAgg] = await Promise.all([
       query("SELECT * FROM leads ORDER BY created_at DESC LIMIT 50"),

@@ -1,6 +1,7 @@
 "use client";
 
 import { EmptyState, ErrorState, LoadingState, PageHead } from "@/components/chrome";
+import { LaporanWeb, type LaporanAktivitas } from "@/components/laporan-web";
 import { useConnect } from "@/lib/use-connect";
 
 export default function ConnectLaporanPage() {
@@ -15,39 +16,20 @@ export default function ConnectLaporanPage() {
       </>
     );
   }
-  const r = data.report;
+  const r = data.report as Record<string, unknown>;
+  // Hanya aktivitas milik laporan terbit terbaru ini yang ditampilkan:
+  // daftar dari API bisa memuat aktivitas laporan lain anak yang sama.
+  const activities = ((data.activities || []) as Array<Record<string, unknown>>)
+    .filter((a) => String(a.report_id) === String(r.id)) as unknown as LaporanAktivitas[];
+  const reporter = (r.teacher_name as string) || (r.facilitator_name as string) || null;
+
   return (
-    <>
-      <PageHead title="Detail Daily Report" subtitle={`${data.child.full_name} · ${String(r.report_date)}`} />
-      <section className="grid kpi">
-        <article className="card kpi-card"><div className="kpi-label">Makan</div><div className="kpi-value" style={{ textTransform: "capitalize", fontSize: 20 }}>{r.meal_level || "-"}</div><p className="muted">{r.meals_text || ""}</p></article>
-        <article className="card kpi-card"><div className="kpi-label">Tidur</div><div className="kpi-value" style={{ textTransform: "capitalize", fontSize: 20 }}>{r.nap_quality || "-"}</div><p className="muted">{r.nap_start || ""} - {r.nap_end || ""}</p></article>
-        <article className="card kpi-card"><div className="kpi-label">Toilet</div><div className="kpi-value" style={{ fontSize: 20 }}>{r.toilet_pee_count || "0"}x pipis · {r.toilet_poop_count || "0"}x BAB</div></article>
-        <article className="card kpi-card"><div className="kpi-label">Mood</div><div className="kpi-value" style={{ textTransform: "capitalize", fontSize: 20 }}>{r.mood || "-"}</div><p className="muted">{r.mood_notes || ""}</p></article>
-      </section>
-      <section className="grid two">
-        <article className="card">
-          <h2>Timeline Aktivitas</h2>
-          {data.activities.length === 0 ? (
-            <EmptyState title="Tidak ada aktivitas tercatat" body="Aktivitas laporan terbit ini belum diisi guru." />
-          ) : (
-            <ul className="timeline">
-              {data.activities.map((a) => (
-                <li key={String(a.id)}>
-                  <time>{String(a.activity_time || "").slice(0, 5) || "--:--"}</time>
-                  <div><strong>{a.title}</strong><div className="muted">{a.apparatus || ""}{a.notes ? ` · ${a.notes}` : ""}</div></div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </article>
-        <article className="card">
-          <h2>Catatan Guru</h2>
-          <p>{r.notes || "Tidak ada catatan tambahan pada laporan ini."}</p>
-          <h3>Kesehatan Hari Ini</h3>
-          <p className="muted">Detail pemeriksaan tersedia di halaman Kesehatan.</p>
-        </article>
-      </section>
-    </>
+    <LaporanWeb
+      report={r as never}
+      activities={activities}
+      childName={String(data.child.full_name)}
+      reporterName={reporter}
+      pdfUrl={`/api/dokumen/laporan/${String(r.id)}/pdf`}
+    />
   );
 }

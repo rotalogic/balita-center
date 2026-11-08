@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { EmptyState, ErrorState, LoadingState, PageHead, StatusBadge } from "@/components/chrome";
+import { EmptyState, ErrorState, LoadingState, PageHead, StatusBadge, useMe } from "@/components/chrome";
 
 type Stats = { children: number; staff: number; branches: number; revenueMonth: number; pendingReports: number; invoicesOpen: number };
 type Dash = {
@@ -13,17 +13,35 @@ type Dash = {
   pendingLeaves: number;
 };
 
+// Sapaan mengikuti jam WIB, bukan jam server/peramban.
+function sapaanWaktu(): string {
+  const jam = Number(
+    new Intl.DateTimeFormat("id-ID", { hour: "2-digit", hour12: false, timeZone: "Asia/Jakarta" }).format(new Date())
+  );
+  if (jam >= 4 && jam < 11) return "Selamat pagi";
+  if (jam >= 11 && jam < 15) return "Selamat siang";
+  if (jam >= 15 && jam < 18) return "Selamat sore";
+  return "Selamat malam";
+}
+
 const rupiah = (value: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(value);
 
 export default function DashboardPage() {
+  const me = useMe();
   const [stats, setStats] = useState<Stats | null>(null);
   const [dash, setDash] = useState<Dash | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [cabang, setCabang] = useState("");
+
   useEffect(() => {
-    fetch("/api/stats").then((r) => r.json()).then((d) => (d.ok ? setStats(d.stats) : setError(d.error))).catch(() => setError("Tidak dapat menghubungi server."));
-    fetch("/api/dashboard").then((r) => r.json()).then((d) => (d.ok ? setDash(d) : null)).catch(() => null);
+    // Filter cabang dari kolom atas (Topbar) dibawa lewat query string.
+    const id = new URLSearchParams(window.location.search).get("branch_id") || localStorage.getItem("bc-branch") || "";
+    setCabang(id);
+    const qs = id ? `?branch_id=${id}` : "";
+    fetch(`/api/stats${qs}`).then((r) => r.json()).then((d) => (d.ok ? setStats(d.stats) : setError(d.error))).catch(() => setError("Tidak dapat menghubungi server."));
+    fetch(`/api/dashboard${qs}`).then((r) => r.json()).then((d) => (d.ok ? setDash(d) : null)).catch(() => null);
   }, []);
 
   const today = new Intl.DateTimeFormat("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date());
@@ -32,8 +50,8 @@ export default function DashboardPage() {
   return (
     <>
       <PageHead
-        title="Selamat pagi, Wildan"
-        subtitle={`Mari terus menciptakan lingkungan terbaik untuk tumbuh kembang anak. ${today}.`}
+        title={`${sapaanWaktu()}, ${me?.full_name?.split(" ")[0] || "…"}`}
+        subtitle={`Mari terus menciptakan lingkungan terbaik untuk tumbuh kembang anak. ${today}.${cabang ? " Menampilkan satu cabang." : ""}`}
         action={<Link className="btn" href="/anak/tambah">+ Tambah Anak</Link>}
       />
       {error ? <ErrorState message={error} /> : null}

@@ -1,59 +1,166 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { PageHead, StatusBadge } from "@/components/chrome";
 import { ApiError, DataSection, KpiGrid, dateFmt, useApi, type AnyRow } from "@/components/module-ui";
 
 type Hr = { staff: AnyRow[]; leaves: AnyRow[]; attendanceToday: number };
+type Leave = {
+  requests: AnyRow[];
+  counts: Record<string, number>;
+  me: { id: string; full_name: string; branch_id: string | null } | null;
+  staff: AnyRow[];
+  canPickStaff: boolean;
+};
 
 export default function SdmPage() {
-  const { data, error, reload } = useApi<Hr>("/api/hr");
-  const [decider, setDecider] = useState("");
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const { data, error } = useApi<Hr>("/api/hr");
+  const leave = useApi<Leave>("/api/hr/leave");
+  const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pemohon, setPemohon] = useState("");
 
   useEffect(() => {
-    if (data && data.staff.length > 0) setDecider((p) => p || String(data.staff[0].id));
-  }, [data]);
+    if (leave.data?.me) setPemohon((p) => p || leave.data!.me!.id);
+  }, [leave.data]);
 
-  async function putuskan(leaveId: string, decision: "disetujui" | "ditolak") {
-    if (!decider) { setFeedback("Pilih staf pemutus dulu."); return; }
+  async function ajukan(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const el = event.currentTarget;
+    const form = new FormData(el);
     setBusy(true);
-    const res = await fetch("/api/hr", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "putuskan_cuti", leave_id: leaveId, decided_by: decider, decision }) });
-    const d = await res.json();
-    setBusy(false);
-    setFeedback(d.ok ? `Permintaan cuti kini berstatus ${d.status}.` : d.error);
-    if (d.ok) reload();
+    setFeedback(null);
+    try {
+      const res = await fetch("/api/hr/leave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: String(form.get("kind") || ""),
+          start_date: String(form.get("start_date") || ""),
+          end_date: String(form.get("end_date") || ""),
+          reason: String(form.get("reason") || ""),
+          staff_id: pemohon || undefined,
+        }),
+      });
+      const d = await res.json();
+      setFeedback({
+        ok: Boolean(d.ok),
+        text: d.ok ? `Pengajuan atas nama ${d.staff_name} terkirim dan menunggu keputusan.` : d.error || "Gagal mengirim pengajuan.",
+      });
+      if (d.ok) {
+        el.reset();
+        leave.reload();
+      }
+    } catch {
+      setFeedback({ ok: false, text: "Koneksi terputus — pengajuan belum terkirim." });
+    } finally {
+      setBusy(false);
+    }
   }
 
-  const pending = data ? data.leaves.filter((l) => l.status === "menunggu").length : 0;
+  async function putuskan(leaveId: string, status: "disetujui" | "ditolak") {
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/hr/leave/${leaveId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const d = await res.json();
+      setFeedback({ ok: Boolean(d.ok), text: d.ok ? `Pengajuan kini berstatus ${d.status}.` : d.error || "Gagal memutuskan." });
+      if (d.ok) leave.reload();
+    } catch {
+      setFeedback({ ok: false, text: "Koneksi terputus — keputusan belum tersimpan." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const pending = leave.data?.counts.menunggu ?? 0;
+  const bisaPilih = Boolean(leave.data?.canPickStaff) && (leave.data?.staff.length ?? 0) > 0;
 
   return (
     <>
       <PageHead title="SDM" subtitle="Data staf, kehadiran, cuti, KPI, rekrutmen, dan onboarding" />
-      <ApiError error={error} />
+      <ApiError error={error || leave.error} />
       <KpiGrid items={[
         { label: "Total Staf & Guru", value: data ? data.staff.length : "...", icon: "⚑", tone: "tone-pink" },
-        { label: "Cuti Menunggu Keputusan", value: data ? pending : "...", icon: "✎", tone: "tone-peach" },
+        { label: "Cuti Menunggu Keputusan", value: leave.data ? pending : "...", icon: "✎", tone: "tone-peach" },
         { label: "Kehadiran Staf Hari Ini", value: data ? data.attendanceToday : "...", icon: "✓", tone: "tone-sage" },
-        { label: "Total Permintaan Cuti", value: data ? data.leaves.length : "...", icon: "▤", tone: "tone-sky" },
+        { label: "Total Permintaan Cuti", value: leave.data ? leave.data.requests.length : "...", icon: "▤", tone: "tone-sky" },
       ]} />
+
+      <article className="card">
+        <h2>Ajukan Cuti / Izin / Lembur</h2>
+        {leave.data && !leave.data.me ? (
+          <div className="alert alert-error" role="alert" style={{ marginBottom: 12 }}>
+            Akun Anda belum tertaut ke data staf, jadi pengajuan tidak bisa dibuat atas nama Anda.{" "}
+            <Link href="/pengguna">Tautkan di menu Pengguna</Link> (Super Admin), lalu muat ulang halaman ini.
+          </div>
+        ) : null}
+        <form onSubmit={ajukan}>
+          <div className="form-grid">
+            {bisaPilih ? (
+              <div className="field">
+                <label htmlFor="lv_staff">Diajukan untuk *</label>
+                <select id="lv_staff" value={pemohon} onChange={(e) => setPemohon(e.target.value)}>
+                  {leave.data!.staff.map((s) => (
+                    <option key={String(s.id)} value={String(s.id)}>
+                      {String(s.full_name)} · {String(s.position)} · {String(s.branch_name || "-")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+            <div className="field"><label htmlFor="lv_kind">Jenis *</label>
+              <select id="lv_kind" name="kind" required defaultValue="cuti">
+                <option value="cuti">Cuti</option>
+                <option value="izin">Izin</option>
+                <option value="lembur">Lembur</option>
+              </select></div>
+            <div className="field"><label htmlFor="lv_sd">Mulai *</label>
+              <input id="lv_sd" name="start_date" type="date" required /></div>
+            <div className="field"><label htmlFor="lv_ed">Selesai *</label>
+              <input id="lv_ed" name="end_date" type="date" required /></div>
+            <div className="field"><label htmlFor="lv_rs">Alasan</label>
+              <input id="lv_rs" name="reason" placeholder="Keperluan keluarga" /></div>
+          </div>
+          <button className="btn small" type="submit" disabled={busy} style={{ marginTop: 8 }}>
+            {busy ? "Mengirim…" : "Kirim Pengajuan"}
+          </button>
+          <p className="hint">
+            {bisaPilih
+              ? "Sebagai Kepala Sekolah/Admin Cabang Anda boleh mengajukan atas nama staf lain."
+              : "Pengajuan tercatat atas nama akun yang login."}
+          </p>
+        </form>
+      </article>
+
       <article className="card">
         <h2>Persetujuan Cuti / Izin / Lembur</h2>
-        <div className="row">
-          <span className="muted">Diputuskan oleh:</span>
-          <select value={decider} onChange={(e) => setDecider(e.target.value)} aria-label="Staf pemutus cuti">
-            <option value="">Pilih staf</option>
-            {(data?.staff || []).map((s) => (<option key={String(s.id)} value={String(s.id)}>{String(s.full_name)} · {String(s.position)}</option>))}
-          </select>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Keputusan tercatat atas nama akun Anda sendiri
+          {leave.data?.me ? ` (${leave.data.me.full_name})` : ""} — tidak ada lagi pilih-pilih nama pemutus.
+        </p>
+        {feedback ? (
+          <p className={feedback.ok ? "success" : "notice"} role="status" style={{ marginTop: 10 }}>
+            {feedback.text}
+          </p>
+        ) : null}
+        <div className="row" style={{ marginTop: 8 }}>
+          <span className="badge">Menunggu: {pending}</span>
+          <span className="badge">Disetujui: {leave.data?.counts.disetujui ?? 0}</span>
+          <span className="badge">Ditolak: {leave.data?.counts.ditolak ?? 0}</span>
         </div>
-        {feedback ? <p className="notice" role="status" style={{ marginTop: 10 }}>{feedback}</p> : null}
       </article>
+
       <DataSection
         title="Permintaan Cuti Terbaru"
-        rows={data ? data.leaves : null}
+        rows={leave.data ? leave.data.requests : null}
         emptyTitle="Belum ada permintaan cuti"
-        emptyBody="Permintaan cuti, izin, dan lembur dari tabel leave_requests tampil di sini untuk diputuskan."
+        emptyBody="Permintaan cuti, izin, dan lembur yang diajukan staf tampil di sini untuk diputuskan."
         columns={[
           { key: "staff_name", label: "Staf", render: (r) => <strong>{String(r.staff_name)}</strong> },
           { key: "kind", label: "Jenis" },
@@ -61,6 +168,7 @@ export default function SdmPage() {
           { key: "end_date", label: "Selesai", render: (r) => dateFmt(r.end_date) },
           { key: "reason", label: "Alasan" },
           { key: "status", label: "Status", render: (r) => <StatusBadge status={String(r.status)} /> },
+          { key: "decided_by_name", label: "Diputuskan", render: (r) => (r.decided_by_name ? String(r.decided_by_name) : <span className="muted">—</span>) },
           { key: "aksi", label: "", render: (r) => r.status === "menunggu" ? (
             <span className="row">
               <button className="btn small" disabled={busy} onClick={() => putuskan(String(r.id), "disetujui")}>Setujui</button>
@@ -69,6 +177,7 @@ export default function SdmPage() {
           ) : <span className="muted">Sudah diputuskan</span> },
         ]}
       />
+
       <DataSection
         title="Data Staf & Guru"
         rows={data ? data.staff : null}

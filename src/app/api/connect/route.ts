@@ -1,15 +1,54 @@
 import { NextResponse } from "next/server";
 import { dbErrorMessage, query } from "@/lib/db";
+import { guard } from "@/lib/current-user";
 
 export const dynamic = "force-dynamic";
 
-// Data Balita Connect untuk satu anak. Tanpa child_id, dipakai anak pertama
-// menurut abjad agar portal bisa langsung dicoba; aplikasi produksi wajib
-// mengganti ini dengan anak milik akun orang tua yang login.
+// Data Balita Connect untuk satu anak.
+// Orang tua/murid HANYA bisa membuka anak yang terhubung ke akunnya lewat
+// guardians.email. Staf (super_admin/owner/kepala_sekolah) boleh memilih anak
+// mana pun untuk keperluan pratinjau.
 export async function GET(request: Request) {
+  const denied = await guard("child.view_own");
+  if (denied.error) return denied.error;
+  const user = denied.user;
   try {
     const { searchParams } = new URL(request.url);
     let childId = searchParams.get("child_id");
+    const preview = searchParams.get("preview") === "1";
+
+    const globalViewer = [...user.roles, user.role].some((role) =>
+      ["super_admin", "owner", "kepala_sekolah"].includes(role)
+    );
+
+    if (!globalViewer) {
+      const milik = await query<{ id: string }>(
+        `SELECT c.id
+           FROM children c
+           JOIN child_guardians cg ON cg.child_id = c.id
+           JOIN guardians g ON g.id = cg.guardian_id
+          WHERE lower(g.email) = lower($1) AND c.deleted_at IS NULL
+          ORDER BY c.full_name`,
+        [user.email]
+      );
+      const allowed = milik.map((row) => row.id);
+      if (allowed.length === 0) {
+        return NextResponse.json({
+          ok: true,
+          child: null,
+          message: "Akun Anda belum terhubung ke data anak. Hubungi admin sekolah.",
+        });
+      }
+      if (!childId) {
+        childId = allowed[0];
+      } else if (!allowed.includes(childId)) {
+        return NextResponse.json(
+          { ok: false, error: "Anda tidak berhak melihat data anak ini." },
+          { status: 403 }
+        );
+      }
+    }
+
     if (!childId) {
       const first = await query<{ id: string }>(
         "SELECT id FROM children WHERE deleted_at IS NULL ORDER BY full_name LIMIT 1"
@@ -22,8 +61,12 @@ export async function GET(request: Request) {
     const [child, report, activities, health, development, events, messages, photos, invoices] = await Promise.all([
       query("SELECT * FROM children WHERE id = $1", [childId]),
       query(
-        `SELECT * FROM daily_reports WHERE child_id = $1 AND status = 'published'
-          ORDER BY report_date DESC LIMIT 1`,
+        `SELECT r.*, lf.full_name AS facilitator_name, s.full_name AS teacher_name
+           FROM daily_reports r
+           LEFT JOIN staff lf ON lf.id = r.lead_facilitator_id
+           LEFT JOIN staff s ON s.id = r.created_by
+          WHERE r.child_id = $1 AND r.status = 'published' AND r.deleted_at IS NULL
+          ORDER BY r.report_date DESC LIMIT 1`,
         [childId]
       ),
       query(
@@ -61,8 +104,18 @@ export async function GET(request: Request) {
         [childId]
       ),
     ]);
+    const wali = childId
+      ? await query<{ full_name: string }>(
+          `SELECT g.full_name FROM child_guardians cg JOIN guardians g ON g.id = cg.guardian_id
+            WHERE cg.child_id = $1 ORDER BY cg.is_primary DESC NULLS LAST LIMIT 1`,
+          [childId]
+        )
+      : [];
+
     return NextResponse.json({
       ok: true,
+      preview,
+      guardian_name: wali[0]?.full_name || null,
       child: child[0] || null,
       report: report[0] || null,
       activities,
@@ -79,6 +132,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const denied = await guard("events.rsvp");
+  if (denied.error) return denied.error;
   try {
     const body = (await request.json()) as {
       kind: string;
@@ -87,6 +142,13 @@ export async function POST(request: Request) {
       guardian_id?: string;
       response?: string;
     };
+    // Mode pratinjau hanya baca: aksi orang tua tidak boleh benar-benar terkirim.
+    if ((body as { preview?: boolean }).preview) {
+      return NextResponse.json(
+        { ok: false, error: "Mode pratinjau hanya baca — aksi orang tua tidak dikirim." },
+        { status: 403 }
+      );
+    }
     if (body.kind === "rsvp") {
       if (!body.child_id || !body.event_id || !body.response) {
         return NextResponse.json({ ok: false, error: "Data RSVP tidak lengkap." }, { status: 400 });
