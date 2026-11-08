@@ -44,6 +44,24 @@ export default function AilsaPage() {
 
   const [kunci, setKunci] = useState<{ tersimpan: boolean; masker: string | null; model: string; base_url: string } | null>(null);
   const [kunciForm, setKunciForm] = useState({ api_key: "", model: "deepseek-chat", base_url: "https://api.deepseek.com/v1" });
+  const [daftarModel, setDaftarModel] = useState<string[]>(["deepseek-chat", "deepseek-reasoner"]);
+
+  async function muatModel() {
+    setBusy("kunci-model");
+    setInfo(null);
+    const res = await fetch("/api/ailsa/kunci", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ aksi: "model_list", ...kunciForm }),
+    });
+    const d = await res.json();
+    setBusy(null);
+    if (!d.ok) {
+      setInfo({ ok: false, text: d.error || "Gagal memuat daftar model." });
+      return;
+    }
+    setDaftarModel(d.models as string[]);
+    setInfo({ ok: true, text: `${(d.models as string[]).length} model ditemukan di server — klik kolom Model untuk memilih, atau ketik nama model lain.` });
+  }
 
   async function aksiKunci(aksi: "simpan" | "hapus" | "uji") {
     setBusy(`kunci-${aksi}`);
@@ -302,10 +320,11 @@ export default function AilsaPage() {
             <input id="kc-key" type="password" autoComplete="off" placeholder={kunci?.tersimpan ? "Biarkan kosong untuk mempertahankan kunci lama" : "sk-…"}
               value={kunciForm.api_key} onChange={(e) => setKunciForm({ ...kunciForm, api_key: e.target.value })} /></div>
           <div className="field"><label htmlFor="kc-model">Model</label>
-            <select id="kc-model" value={kunciForm.model} onChange={(e) => setKunciForm({ ...kunciForm, model: e.target.value })}>
-              <option value="deepseek-chat">deepseek-chat (cepat, untuk chat & draf)</option>
-              <option value="deepseek-reasoner">deepseek-reasoner (penalaran lebih dalam)</option>
-            </select></div>
+            <input id="kc-model" list="kc-daftar-model" placeholder="deepseek-chat" value={kunciForm.model} onChange={(e) => setKunciForm({ ...kunciForm, model: e.target.value })} />
+            <datalist id="kc-daftar-model">
+              {daftarModel.map((m) => (<option key={m} value={m} />))}
+            </datalist>
+            <small className="muted">Pilih dari daftar atau ketik nama model apa pun. Tombol Muat Model Terbaru mengambil daftar persis dari server — selalu yang paling baru.</small></div>
           <div className="field"><label htmlFor="kc-base">Base URL</label>
             <input id="kc-base" type="url" value={kunciForm.base_url} onChange={(e) => setKunciForm({ ...kunciForm, base_url: e.target.value })} /></div>
         </div>
@@ -315,6 +334,9 @@ export default function AilsaPage() {
           </button>
           <button type="button" className="btn secondary" disabled={busy?.startsWith("kunci")} onClick={() => void aksiKunci("uji")}>
             {busy === "kunci-uji" ? "Menguji…" : "Uji Koneksi"}
+          </button>
+          <button type="button" className="btn secondary" disabled={busy?.startsWith("kunci")} onClick={() => void muatModel()}>
+            {busy === "kunci-model" ? "Memuat…" : "Muat Model Terbaru"}
           </button>
           {kunci?.tersimpan ? (
             <button type="button" className="btn secondary" style={{ color: "#b42318", borderColor: "#f0c4bf" }} disabled={busy?.startsWith("kunci")} onClick={() => void aksiKunci("hapus")}>
