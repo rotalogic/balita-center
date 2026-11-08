@@ -1,103 +1,88 @@
-# Balita Center: Paket Source Code untuk VPS
+# Balita Center
 
-ERP PAUD/Montessori multi-cabang Balita Center sebagai proyek mandiri
-**Next.js 14 + React + TypeScript + PostgreSQL 16**, siap dipasang di VPS
-dan dikembangkan lanjut. Paket ini adalah padanan source code dari aplikasi
-Balita Center yang berjalan hosted di Muse, dengan database PostgreSQL
-yang sama persis (file SQL 1 file di folder `database/`).
+ERP untuk PAUD/Montessori multi-cabang: data anak, laporan harian, rapor
+periodik, keuangan SPP, admission, dan portal orang tua (Balita Connect).
 
-## Isi paket
+**Stack:** Next.js 14 (App Router) + React + TypeScript + PostgreSQL 16.
+Autentikasi sungguhan (kata sandi scrypt, sesi, RBAC per peran), Jejak Audit
+untuk perubahan penting, dan PDF server (pdfkit) yang mengikuti tampilan web.
 
-| Bagian | Isi |
+Versi: **1.2.0**
+
+## Fitur utama
+
+| Area | Isi |
 |---|---|
-| `src/app/login/` | Layar login meniru versi Muse (panel visual + kartu login + pemilih 10 peran). Konteks kerja berlabel, bukan autentikasi sungguhan |
-| `src/app/(admin)/` | Dashboard (KPI, grafik laporan 7 hari, jadwal hari ini, aktivitas terbaru, antrean persetujuan), Anak Didik (daftar + ringkasan + filter, wizard tambah 4 langkah + Data Awal, detail 4 tab), Daily Reports (tab status + ekspor CSV, editor dua kolom multi-aktivitas dengan Timeline Hari Ini dan tanda tangan guru, Review & Approval dengan tab, pratinjau, dan checklist syarat terbit), serta halaman modul khusus Akademik, Admission, Keuangan, SDM, Cabang, Laporan, Investor, Komunikasi, Pengaturan yang membaca data tabel aslinya |
-| `src/app/(parent)/connect/` | Balita Connect 9 seksi: dashboard orang tua, Pesan, Detail Daily Report (hanya laporan terbit), Perkembangan, Kesehatan, Kegiatan + RSVP, Galeri, Pembayaran, Pengaturan |
-| `src/app/api/` | `stats`, `counts`, `meta` (data awal cabang/program/kelas/staf), `children` (GET/POST + detail), `daily-reports` (GET/POST + detail + review), `dashboard`, `finance` (tagihan, SPP massal, konfirmasi bayar masuk Buku Kas), `hr` (staf, cuti, keputusan cuti), `modules` (admission/cabang/investor/komunikasi/pengaturan/akademik/laporan), `connect` (data orang tua + RSVP) |
-| `src/lib/db.ts` | Pool PostgreSQL (`pg`) dari `DATABASE_URL` |
-| `database/balita-center-database.sql` | Skema lengkap 66 tabel, 158 FK, seed RBAC 10 peran/23 izin/105 pemetaan, kueri verifikasi |
-| `docker-compose.yml` | Aplikasi + PostgreSQL satu perintah, SQL terpasang otomatis saat database pertama kali dibuat |
-| `Dockerfile` | Build produksi Next.js standalone |
+| Anak Didik | Wizard tambah anak, profil 4 tab (Profil, Pendidikan & STPPA, Kesehatan, Laporan & Perkembangan), sampah/pulihkan |
+| Kesehatan | **Formulir catat pemeriksaan** (berat, tinggi, lingkar kepala, suhu, status gizi berlabel manusiawi) — mengisi Connect dan panel Tumbuh Kembang rapor |
+| Perkembangan | **Formulir penilaian berkala** 7 aspek (persentase) + observasi milestone otomatis dari laporan harian |
+| Daily Reports | Editor lengkap: aktivitas dengan **pemilih material katalog AMI + milestone**, area/lokasi/mode kerja, bintang 1–4, Circle Time, Moment Special, Saran di Rumah, foto & **video** (poster otomatis); alur draft → review → terbit dengan Syarat Terbit; tampilan web ala portal + unduh PDF |
+| Rapor | Rapor periodik per siklus: 13 narasi (6 aspek STPPA + 5 area Montessori + kesimpulan + saran), agregasi presensi & tumbuh kembang, dokumentasi foto/video, terbit terkunci, PDF mengikuti web |
+| Akademik | Siklus belajar, butir STPPA (form + impor CSV), **kelola katalog material & milestone** (tambah, aktif/nonaktif, draf/aktif/arsip, pemetaan material↔milestone) |
+| Keuangan | Tagihan SPP per anak/periode + massal, kwitansi otomatis saat lunas, Buku Kas |
+| Admission | Pipeline lead (kanban) dari tanya sampai terdaftar |
+| Ailsa | Simulator staf (Tahap 0) + Bank Pengetahuan; kanal WhatsApp menunggu kredensial Meta |
+| Balita Connect | Portal orang tua terikat akun wali: laporan & rapor terbit saja, perkembangan, kesehatan, galeri foto/video, pembayaran, pesan |
+| Lainnya | Absensi, SDM & cuti, Cabang, Laporan & ekspor, Jejak Audit, Pengaturan & pengguna |
 
-Desain mengikuti sistem visual Balita Center: krem hangat `#FFF9F0`, biru tua
-`#173FAD`, teal `#008F83`, sage `#BCE9D7`, font Plus Jakarta Sans + Inter,
-sidebar teks 240px, radius 12-20px. Paket ini memakai CSS variabel bertoken
-(`src/app/globals.css`) alih-alih Tailwind agar instalasi di VPS ringan;
-token warna, tipografi, dan radiusnya sama dengan brief.
+## Menjalankan dengan Docker (disarankan untuk VPS)
 
-## Cara pasang di VPS (Docker, disarankan)
-
-Prasyarat: Docker + Docker Compose terpasang di VPS.
+Prasyarat: Docker + Docker Compose.
 
 ```bash
-unzip Balita-Center-Source-Code-VPS.zip
-cd balita-center-app
-# GANTI kata sandi di docker-compose.yml (POSTGRES_PASSWORD dan DATABASE_URL)
+cp .env.example .env        # sesuaikan DATABASE_URL & kata sandi
 docker compose up -d --build
 ```
 
-Aplikasi jalan di `http://IP-VPS:3000`, PostgreSQL di port `54329`.
-File SQL di folder `database/` otomatis dijalankan saat volume database
-pertama kali dibuat. Bila volume sudah pernah dibuat dan Anda ingin memasang
-ulang dari nol: `docker compose down -v` lalu `docker compose up -d --build`
+Aplikasi di `http://IP-VPS:3000`. File SQL di `database/` berjalan otomatis
+saat volume database pertama kali dibuat. Pasang ulang dari nol:
+`docker compose down -v` lalu `docker compose up -d --build`
 (PERINGATAN: menghapus semua data).
 
-## Cara pasang tanpa Docker
+**Urutan SQL untuk pemasangan manual / upgrade:** jalankan
+`database/balita-center-database.sql`, lalu `database/02-migrasi-dan-seed.sql`
+(sudah menggabungkan seluruh migrasi tambahan termasuk rapor & media).
+File `database/migrasi-*.sql` adalah riwayat migrasi per tahap.
 
-Prasyarat: Node.js 18.18+ dan PostgreSQL 16.
+## Menjalankan tanpa Docker (pengembangan)
+
+Prasyarat: Node.js 20 dan PostgreSQL 16.
 
 ```bash
 createdb balita_center
-cp .env.example .env.local   # isi DATABASE_URL
-npm run db:setup              # memasang database/balita-center-database.sql
+cp .env.example .env.local  # isi DATABASE_URL, AUTH_SECRET, APP_BASE_URL
+npm run db:setup            # memasang skema utama
+psql "$DATABASE_URL" -f database/02-migrasi-dan-seed.sql
 npm install
 npm run build
-npm run start                 # http://localhost:3000
+npm run start               # http://localhost:3000
 ```
 
 Mode pengembangan: `npm run dev`.
 
-## Urutan pemakaian pertama (database memang kosong)
+Variabel lingkungan: lihat `.env.example`. Unggahan berkas tersimpan lokal di
+`UPLOAD_DIR` atau ke S3/R2 bila `S3_*` diisi. Kanal WhatsApp Ailsa aktif bila
+`AILSA_WHATSAPP_TOKEN`, `AILSA_PHONE_NUMBER_ID`, dan `AILSA_LLM_API_KEY` terisi.
 
-1. Buka aplikasi, masuk menu **Anak Didik, Tambah Anak**.
-2. Di panel **Data Awal**, buat berurutan: cabang, program, kelas, staf.
-3. Isi formulir anak (4 bagian) lalu simpan.
-4. Buat **Daily Report**, pilih fasilitator utama, isi aktivitas berbintang
-   dengan aparatus dan URL foto, lalu kirim untuk review.
-5. Di **Review & Approval**, setujui dan terbitkan. Penerbitan dijaga trigger
-   PostgreSQL: laporan yang syaratnya belum lengkap ditolak database dan
-   pesan penolakannya tampil di layar.
-6. Buka **Balita Connect** dari tautan portal orang tua untuk melihat sisi
-   orang tua (laporan terbit, kesehatan, perkembangan, kegiatan + RSVP, pesan).
+## Urutan pemakaian pertama (database kosong)
 
-## Batas paket ini (jujur)
+1. Masuk sebagai super admin, buat **Data Awal**: cabang, program, kelas, staf.
+2. Tambah anak lewat **Anak Didik → Tambah Anak** (wali terhubung untuk Connect).
+3. Di **Akademik**, tinjau katalog material & milestone (aktifkan yang dipakai).
+4. Buat **Daily Report**, kirim untuk review, lalu terbitkan dari Review.
+5. Catat ukur anak di tab **Kesehatan** dan penilaian di tab
+   **Laporan & Perkembangan** pada profil anak.
+6. Buat siklus dan **Rapor** dari menu Rapor; terbitkan agar tampil di Connect.
+7. Orang tua masuk lewat **Balita Connect** dengan akun walinya.
 
-- Layar login meniru tampilan versi Muse tetapi tetap konteks kerja
-  berlabel: kata sandi tidak diperiksa, peran hanya disimpan sebagai label
-  di peramban. Untuk produksi, tambahkan Auth.js/NextAuth dan kaitkan
-  `user_roles` + `user_branches`.
-- Balita Connect membaca anak pertama menurut abjad sebagai konteks demo
-  orang tua. Produksi wajib memetakan akun orang tua ke anaknya.
-- Belum ada integrasi WhatsApp (Bot Ailsa) dan payment gateway; tabel,
-  antrean, dan alur datanya sudah disiapkan di skema, dan halaman Admission
-  membacanya. Pembayaran dicatat + dikonfirmasi staf dan masuk Buku Kas.
-- Unggah foto berkas belum memakai storage S3/R2; dokumentasi laporan
-  dicatat sebagai URL media dan tampil di Galeri orang tua setelah terbit.
-- Alur kerja penuh yang berfungsi: data awal, anak didik, laporan harian
-  sampai terbit, SPP massal + konfirmasi pembayaran, dan keputusan cuti.
-  Halaman modul lain menampilkan data tabel aslinya (daftar, agregat,
-  ringkasan), tetapi formulir tambah/edit per modul itu belum dibuat.
-- Tampilan disamakan semirip mungkin dengan versi Muse dalam struktur,
-  palet, dan susunan layar; bukan salinan piksel-per-piksel, dan versi Muse
-  tetap memuat beberapa layar kerja yang lebih rinci.
-- Row Level Security per cabang/anak belum diaktifkan; kolom pendukungnya
-  (`branch_id`, `user_branches`, `user_roles`) sudah ada di skema.
+## Pemeriksaan otomatis
 
-## Verifikasi database setelah pasang
+Setiap push/PR ke `main` menjalankan **Build Check** (GitHub Actions):
+`npm ci` lalu `npm run build`. Build tidak membutuhkan database.
 
-```sql
-SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public'; -- 66
-SELECT COUNT(*) FROM roles;          -- 10
-SELECT COUNT(*) FROM permissions;    -- 23
-SELECT COUNT(*) FROM role_permissions; -- 105
-```
+## Catatan kejujuran
+
+- Analisa Ailsa bersifat **internal staf**; orang tua hanya menerima Daily
+  Report dan rapor resmi terbitan guru.
+- Draf narasi rapor adalah dokumen guru: boleh dibantu data observasi,
+  wajib diedit dan disetujui guru sebelum terbit.

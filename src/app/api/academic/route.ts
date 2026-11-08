@@ -13,7 +13,7 @@ export async function GET() {
   if (denied.error) return denied.error;
   try {
     const scope = branchScope(denied.user);
-    const [cycles, stppa, classes, branches] = await Promise.all([
+    const [cycles, stppa, classes, branches, materials, milestones, materialMilestones] = await Promise.all([
       query(
         `SELECT c.*, b.name AS branch_name, k.name AS class_name,
                 (SELECT count(*)::int FROM cycle_reports cr WHERE cr.cycle_id = c.id) AS report_count
@@ -27,6 +27,9 @@ export async function GET() {
       query(`SELECT * FROM stppa_items ORDER BY age_group, aspect, sort_order, item_text LIMIT 1000`),
       query("SELECT id, name, branch_id FROM classes ORDER BY name"),
       query("SELECT id, name FROM branches ORDER BY name"),
+      query("SELECT * FROM materials ORDER BY area, name LIMIT 500"),
+      query("SELECT * FROM milestones ORDER BY age_group, indikator LIMIT 500"),
+      query("SELECT material_id, milestone_id FROM material_milestones"),
     ]);
     return NextResponse.json({
       ok: true,
@@ -36,6 +39,9 @@ export async function GET() {
       branches,
       aspects: ASPEK_STPPA,
       ageGroups: KELOMPOK_USIA,
+      materials,
+      milestones,
+      materialMilestones,
     });
   } catch (error) {
     return NextResponse.json({ ok: false, error: dbErrorMessage(error) }, { status: 503 });
@@ -54,7 +60,21 @@ type Body = {
   item_text?: string;
   sort_order?: number | string;
   csv?: string;
+  id?: string;
+  name?: string;
+  name_en?: string;
+  area?: string;
+  is_active?: boolean;
+  indikator?: string;
+  montessori_area?: string;
+  status?: string;
+  material_id?: string;
+  milestone_id?: string;
 };
+
+const AREA_MATERIAL = ["practical_life", "language", "sensorial", "mathematics", "cultural", "observasi"];
+const USIA_MILESTONE = ["0-<1", "1-<2", "2-<3", "3-<4", "4-<5", "5-6"];
+const ASPEK_MILESTONE = ["nilai_agama_moral", "fisik_motorik", "kognitif", "bahasa", "sosial_emosional", "seni"];
 
 export async function POST(request: Request) {
   const denied = await guard("settings.manage");
@@ -193,7 +213,93 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, id: rows[0].id });
     }
 
-    return NextResponse.json({ ok: false, error: "kind harus 'cycle', 'stppa', atau 'stppa_import'." }, { status: 400 });
+    // ---------- Katalog material Montessori AMI ----------
+    if (body.kind === "material_create") {
+      const nama = (body.name || "").trim();
+      if (nama.length < 2) return NextResponse.json({ ok: false, error: "Nama material minimal 2 karakter." }, { status: 400 });
+      if (!body.area || !AREA_MATERIAL.includes(body.area)) {
+        return NextResponse.json({ ok: false, error: `Area harus salah satu: ${AREA_MATERIAL.join(", ")}.` }, { status: 400 });
+      }
+      if (body.age_group && !["0-3", "3-6"].includes(body.age_group)) {
+        return NextResponse.json({ ok: false, error: "Kelompok usia material harus 0-3 atau 3-6." }, { status: 400 });
+      }
+      const kembar = await query<{ id: string }>("SELECT id FROM materials WHERE lower(btrim(name)) = lower($1)", [nama]);
+      if (kembar.length > 0) return NextResponse.json({ ok: false, error: "Material dengan nama itu sudah ada di katalog." }, { status: 409 });
+      const rows = await query<{ id: string }>(
+        "INSERT INTO materials (name, name_en, area, age_group) VALUES ($1,$2,$3,$4) RETURNING id",
+        [nama, body.name_en || null, body.area, body.age_group || null]
+      );
+      await catatAudit(denied.user, { action: "material.create", entityTable: "materials", entityId: rows[0].id, detail: { nama, area: body.area } });
+      return NextResponse.json({ ok: true, id: rows[0].id });
+    }
+
+    if (body.kind === "material_toggle") {
+      if (!body.id) return NextResponse.json({ ok: false, error: "id material wajib." }, { status: 400 });
+      const rows = await query<{ id: string }>(
+        "UPDATE materials SET is_active = $2 WHERE id = $1 RETURNING id",
+        [body.id, body.is_active === true]
+      );
+      if (rows.length === 0) return NextResponse.json({ ok: false, error: "Material tidak ditemukan." }, { status: 404 });
+      await catatAudit(denied.user, { action: "material.toggle", entityTable: "materials", entityId: body.id, detail: { is_active: body.is_active === true } });
+      return NextResponse.json({ ok: true });
+    }
+
+    // ---------- Katalog milestone perkembangan ----------
+    if (body.kind === "milestone_create") {
+      const indikator = (body.indikator || "").trim();
+      if (indikator.length < 5) return NextResponse.json({ ok: false, error: "Indikator milestone minimal 5 karakter." }, { status: 400 });
+      if (!body.age_group || !USIA_MILESTONE.includes(body.age_group)) {
+        return NextResponse.json({ ok: false, error: `Kelompok usia harus salah satu: ${USIA_MILESTONE.join(", ")}.` }, { status: 400 });
+      }
+      if (!body.aspect || !ASPEK_MILESTONE.includes(body.aspect)) {
+        return NextResponse.json({ ok: false, error: `Aspek harus salah satu: ${ASPEK_MILESTONE.join(", ")}.` }, { status: 400 });
+      }
+      if (body.montessori_area && !AREA_MATERIAL.includes(body.montessori_area)) {
+        return NextResponse.json({ ok: false, error: "Area Montessori tidak dikenal." }, { status: 400 });
+      }
+      const kembar = await query<{ id: string }>(
+        "SELECT id FROM milestones WHERE lower(btrim(indikator)) = lower($1) AND age_group = $2",
+        [indikator, body.age_group]
+      );
+      if (kembar.length > 0) return NextResponse.json({ ok: false, error: "Indikator yang sama sudah ada di kelompok usia itu." }, { status: 409 });
+      const rows = await query<{ id: string }>(
+        "INSERT INTO milestones (indikator, age_group, aspect, montessori_area, status) VALUES ($1,$2,$3,$4,'draf') RETURNING id",
+        [indikator, body.age_group, body.aspect, body.montessori_area || null]
+      );
+      await catatAudit(denied.user, { action: "milestone.create", entityTable: "milestones", entityId: rows[0].id, detail: { indikator, usia: body.age_group } });
+      return NextResponse.json({ ok: true, id: rows[0].id });
+    }
+
+    if (body.kind === "milestone_status") {
+      if (!body.id || !body.status || !["draf", "aktif", "arsip"].includes(body.status)) {
+        return NextResponse.json({ ok: false, error: "Status harus draf, aktif, atau arsip." }, { status: 400 });
+      }
+      const rows = await query<{ id: string }>("UPDATE milestones SET status = $2 WHERE id = $1 RETURNING id", [body.id, body.status]);
+      if (rows.length === 0) return NextResponse.json({ ok: false, error: "Milestone tidak ditemukan." }, { status: 404 });
+      await catatAudit(denied.user, { action: "milestone.status", entityTable: "milestones", entityId: body.id, detail: { status: body.status } });
+      return NextResponse.json({ ok: true });
+    }
+
+    // ---------- Pemetaan material <-> milestone ----------
+    if (body.kind === "mapping_add" || body.kind === "mapping_remove") {
+      if (!body.material_id || !body.milestone_id) {
+        return NextResponse.json({ ok: false, error: "material_id dan milestone_id wajib." }, { status: 400 });
+      }
+      if (body.kind === "mapping_add") {
+        await query("INSERT INTO material_milestones (material_id, milestone_id) VALUES ($1,$2) ON CONFLICT DO NOTHING", [body.material_id, body.milestone_id]);
+      } else {
+        await query("DELETE FROM material_milestones WHERE material_id = $1 AND milestone_id = $2", [body.material_id, body.milestone_id]);
+      }
+      await catatAudit(denied.user, {
+        action: body.kind === "mapping_add" ? "material_milestone.add" : "material_milestone.remove",
+        entityTable: "material_milestones",
+        entityId: body.material_id,
+        detail: { milestone_id: body.milestone_id },
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    return NextResponse.json({ ok: false, error: "kind harus 'cycle', 'stppa', 'stppa_import', 'material_create', 'material_toggle', 'milestone_create', 'milestone_status', 'mapping_add', atau 'mapping_remove'." }, { status: 400 });
   } catch (error) {
     return NextResponse.json({ ok: false, error: dbErrorMessage(error) }, { status: 500 });
   }

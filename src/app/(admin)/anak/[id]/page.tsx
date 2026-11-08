@@ -86,6 +86,35 @@ export default function DetailAnakPage() {
     else setUkurError(d.error || "Gagal menghapus catatan.");
   }
 
+  const [devForm, setDevForm] = useState<Record<string, string>>({ recorded_on: new Date().toISOString().slice(0, 10) });
+  const [devInfo, setDevInfo] = useState<string | null>(null);
+  const [devError, setDevError] = useState<string | null>(null);
+  const [devBusy, setDevBusy] = useState(false);
+  const setD = (k: string, v: string) => setDevForm((p) => ({ ...p, [k]: v }));
+
+  async function simpanDev() {
+    setDevBusy(true);
+    setDevInfo(null);
+    setDevError(null);
+    const res = await fetch(`/api/children/${params.id}/development`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(devForm),
+    });
+    const d = await res.json();
+    setDevBusy(false);
+    if (!d.ok) { setDevError(d.error || "Gagal mencatat perkembangan."); return; }
+    setDevForm({ recorded_on: new Date().toISOString().slice(0, 10) });
+    setDevInfo("Catatan perkembangan tersimpan. Nilai terbaru tampil di kartu Perkembangan Terakhir dan halaman Perkembangan Balita Connect.");
+    muat();
+  }
+
+  async function hapusDev(recordId: string) {
+    if (!window.confirm("Hapus catatan perkembangan ini?")) return;
+    const res = await fetch(`/api/children/${params.id}/development?record_id=${recordId}`, { method: "DELETE" });
+    const d = await res.json();
+    if (d.ok) muat();
+    else setDevError(d.error || "Gagal menghapus catatan.");
+  }
+
   if (error) return (<><PageHead title="Detail Anak Didik" /><ErrorState message={error} /></>);
   if (!data) return (<><PageHead title="Detail Anak Didik" /><LoadingState /></>);
 
@@ -296,6 +325,7 @@ export default function DetailAnakPage() {
       ) : null}
 
       {tab === "Laporan & Perkembangan" ? (
+        <>
         <section className="grid two">
           <article className="card">
             <h2>Daily Report Terakhir</h2>
@@ -312,7 +342,7 @@ export default function DetailAnakPage() {
           <article className="card">
             <h2>Perkembangan Terakhir</h2>
             {!dev ? (
-              <EmptyState title="Belum ada catatan perkembangan" body="Catatan per aspek dari tabel child_development_records tampil di sini dan di Balita Connect." />
+              <EmptyState title="Belum ada catatan perkembangan" body="Isi penilaian pertama lewat formulir Catat Perkembangan Berkala di bawah — hasilnya tampil di sini dan di Balita Connect orang tua." />
             ) : (
               <>
                 {ASPECTS.map(([key, label]) => (
@@ -322,10 +352,56 @@ export default function DetailAnakPage() {
                   </div>
                 ))}
                 <p className="muted">Periode: {String(dev.recorded_on)}</p>
+                {dev.teacher_notes ? <p><strong>Catatan guru:</strong> {String(dev.teacher_notes)}</p> : null}
+                {dev.parent_recommendations ? <p><strong>Rekomendasi untuk orang tua:</strong> {String(dev.parent_recommendations)}</p> : null}
               </>
             )}
           </article>
         </section>
+
+        <article className="card" style={{ marginTop: 16 }}>
+          <h2>Catat Perkembangan Berkala</h2>
+          <p className="muted">Nilai capaian per aspek dalam persen (0–100). Isi aspek yang dinilai saja; kosongkan yang belum dinilai pada periode ini.</p>
+          {devInfo ? <p className="success" role="status">{devInfo}</p> : null}
+          {devError ? <p className="error" role="alert">{devError}</p> : null}
+          <div className="form-grid">
+            <div className="field"><label htmlFor="dv-tanggal">Tanggal Penilaian *</label>
+              <input id="dv-tanggal" type="date" value={devForm.recorded_on || ""} onChange={(e) => setD("recorded_on", e.target.value)} /></div>
+            <div className="field"><label htmlFor="dv-oleh">Dinilai oleh</label>
+              <select id="dv-oleh" value={devForm.recorded_by || ""} onChange={(e) => setD("recorded_by", e.target.value)}>
+                <option value="">Pilih staf</option>
+                {staf.map((s) => (<option key={s.id} value={s.id}>{s.full_name} — {s.position}</option>))}
+              </select></div>
+            {ASPECTS.map(([key, label]) => (
+              <div className="field" key={key}><label htmlFor={`dv-${key}`}>{label} (%)</label>
+                <input id={`dv-${key}`} type="number" min="0" max="100" step="1" placeholder="0–100" value={devForm[key] || ""} onChange={(e) => setD(key, e.target.value)} /></div>
+            ))}
+            <div className="field"><label htmlFor="dv-notes">Catatan Guru</label>
+              <input id="dv-notes" type="text" placeholder="Ringkasan observasi periode ini" value={devForm.teacher_notes || ""} onChange={(e) => setD("teacher_notes", e.target.value)} /></div>
+            <div className="field"><label htmlFor="dv-rek">Rekomendasi untuk Orang Tua</label>
+              <input id="dv-rek" type="text" placeholder="Stimulasi yang disarankan di rumah" value={devForm.parent_recommendations || ""} onChange={(e) => setD("parent_recommendations", e.target.value)} /></div>
+          </div>
+          <div className="row" style={{ marginTop: 12 }}>
+            <button type="button" className="btn" disabled={devBusy} onClick={() => void simpanDev()}>{devBusy ? "Menyimpan…" : "Simpan Penilaian"}</button>
+          </div>
+          {data.development.length > 0 ? (
+            <>
+              <h3>Riwayat Penilaian</h3>
+              <ul className="timeline">
+                {data.development.map((r) => (
+                  <li key={String(r.id)}>
+                    <time>{String(r.recorded_on)}</time>
+                    <div>
+                      {ASPECTS.filter(([k]) => r[k] !== null && r[k] !== undefined).map(([k, label]) => `${label} ${String(r[k])}%`).join(" · ") || "Tanpa nilai aspek"}
+                      <div><button type="button" className="btn small danger" style={{ marginTop: 4 }} onClick={() => void hapusDev(String(r.id))}>Hapus</button></div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+        </article>
+        </>
       ) : null}
     </>
   );

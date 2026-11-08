@@ -23,6 +23,22 @@ type Butir = {
   sort_order: number;
   is_active: boolean;
 };
+type Material = {
+  id: string;
+  name: string;
+  name_en: string | null;
+  area: string;
+  age_group: string | null;
+  is_active: boolean;
+};
+type Milestone = {
+  id: string;
+  indikator: string;
+  age_group: string;
+  aspect: string;
+  montessori_area: string | null;
+  status: string;
+};
 type Data = {
   cycles: Cycle[];
   stppa: Butir[];
@@ -30,7 +46,20 @@ type Data = {
   branches: Array<{ id: string; name: string }>;
   aspects: Array<{ code: string; label: string }>;
   ageGroups: string[];
+  materials: Material[];
+  milestones: Milestone[];
+  materialMilestones: Array<{ material_id: string; milestone_id: string }>;
 };
+
+const LABEL_AREA: Record<string, string> = {
+  practical_life: "Practical Life", language: "Language", sensorial: "Sensorial",
+  mathematics: "Mathematics", cultural: "Cultural", observasi: "Observasi",
+};
+const LABEL_ASPEK_MS: Record<string, string> = {
+  nilai_agama_moral: "Nilai Agama & Moral", fisik_motorik: "Fisik Motorik", kognitif: "Kognitif",
+  bahasa: "Bahasa", sosial_emosional: "Sosial Emosional", seni: "Seni",
+};
+const USIA_MS = ["0-<1", "1-<2", "2-<3", "3-<4", "4-<5", "5-6"];
 
 const CONTOH_CSV = `Kelompok Usia;Aspek;Butir
 3-4 tahun;Nilai Agama & Moral;Mengucap salam kepada guru dan teman
@@ -95,6 +124,25 @@ export default function AkademikPage() {
     setInfo(pesan);
     setEdit(null);
     load();
+  }
+
+  const [matForm, setMatForm] = useState({ name: "", name_en: "", area: "practical_life", age_group: "3-6" });
+  const [msForm, setMsForm] = useState({ indikator: "", age_group: "3-<4", aspect: "kognitif", montessori_area: "" });
+  const [petaPilihan, setPetaPilihan] = useState<Record<string, string>>({});
+
+  async function simpanKatalog(payload: Record<string, unknown>, pesan: string) {
+    setBusy("katalog");
+    setError(null);
+    setInfo(null);
+    const { ok, data: d } = await kirimJson("/api/academic", "POST", payload);
+    setBusy(null);
+    if (!ok) {
+      setError(String(d.error || "Gagal menyimpan katalog."));
+      return false;
+    }
+    setInfo(pesan);
+    load();
+    return true;
   }
 
   async function imporCsv() {
@@ -292,6 +340,143 @@ export default function AkademikPage() {
                 <li key={g.baris}><strong>Baris {g.baris}:</strong> {g.alasan} <span className="muted">({g.isi})</span></li>
               ))}
             </ul>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <h2 style={{ marginTop: 0 }}>Katalog Material Montessori AMI ({(data.materials || []).length})</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Material aktif tampil sebagai pilihan di editor laporan harian. Nonaktifkan material yang tidak dipakai lagi — laporan lama yang memakainya tetap utuh.
+        </p>
+        <div className="form-grid">
+          <div className="field"><label htmlFor="mt-nama">Nama Material *</label>
+            <input id="mt-nama" value={matForm.name} onChange={(e) => setMatForm({ ...matForm, name: e.target.value })} placeholder="mis. Pink Tower" /></div>
+          <div className="field"><label htmlFor="mt-inggris">Nama Inggris</label>
+            <input id="mt-inggris" value={matForm.name_en} onChange={(e) => setMatForm({ ...matForm, name_en: e.target.value })} placeholder="opsional" /></div>
+          <div className="field"><label htmlFor="mt-area">Area</label>
+            <select id="mt-area" value={matForm.area} onChange={(e) => setMatForm({ ...matForm, area: e.target.value })}>
+              {Object.entries(LABEL_AREA).map(([v, l]) => (<option key={v} value={v}>{l}</option>))}
+            </select></div>
+          <div className="field"><label htmlFor="mt-usia">Kelompok Usia</label>
+            <select id="mt-usia" value={matForm.age_group} onChange={(e) => setMatForm({ ...matForm, age_group: e.target.value })}>
+              <option value="0-3">0–3 tahun</option>
+              <option value="3-6">3–6 tahun</option>
+            </select></div>
+        </div>
+        <div className="row" style={{ marginTop: 8 }}>
+          <button type="button" className="btn small" disabled={busy === "katalog" || !matForm.name.trim()}
+            onClick={async () => { if (await simpanKatalog({ kind: "material_create", ...matForm }, "Material ditambahkan ke katalog.")) setMatForm({ name: "", name_en: "", area: "practical_life", age_group: "3-6" }); }}>
+            + Tambah Material
+          </button>
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          {(data.materials || []).map((m) => {
+            const terkait = (data.materialMilestones || []).filter((mm) => mm.material_id === m.id)
+              .map((mm) => (data.milestones || []).find((x) => x.id === mm.milestone_id)).filter(Boolean) as Milestone[];
+            const belum = (data.milestones || []).filter((x) => x.status !== "arsip" && !terkait.some((t) => t.id === x.id));
+            return (
+              <div key={m.id} style={{ borderTop: "1px solid var(--line)", padding: "10px 0" }}>
+                <div className="row spread">
+                  <span><strong>{m.name}</strong> <span className="muted">· {LABEL_AREA[m.area] || m.area}{m.age_group ? ` · usia ${m.age_group}` : ""}</span></span>
+                  <span className="row">
+                    <StatusBadge status={m.is_active ? "aktif" : "nonaktif"} />
+                    <button type="button" className="btn small secondary" disabled={busy === "katalog"}
+                      onClick={() => void simpanKatalog({ kind: "material_toggle", id: m.id, is_active: !m.is_active }, m.is_active ? "Material dinonaktifkan." : "Material diaktifkan lagi.")}>
+                      {m.is_active ? "Nonaktifkan" : "Aktifkan"}
+                    </button>
+                  </span>
+                </div>
+                <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                  <span className="muted" style={{ fontSize: 12 }}>Milestone terkait:</span>
+                  {terkait.length === 0 ? <span className="muted" style={{ fontSize: 12 }}>belum ada</span> : terkait.map((t) => (
+                    <span key={t.id} className="chip" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                      {t.indikator}
+                      <button type="button" aria-label={`Lepas pemetaan ${t.indikator}`} style={{ border: "none", background: "none", cursor: "pointer", padding: 0 }}
+                        onClick={() => void simpanKatalog({ kind: "mapping_remove", material_id: m.id, milestone_id: t.id }, "Pemetaan dilepas.")}>×</button>
+                    </span>
+                  ))}
+                  {belum.length > 0 ? (
+                    <>
+                      <select aria-label={`Pilih milestone untuk ${m.name}`} value={petaPilihan[m.id] || ""} onChange={(e) => setPetaPilihan({ ...petaPilihan, [m.id]: e.target.value })}>
+                        <option value="">Petakan milestone…</option>
+                        {belum.map((x) => (<option key={x.id} value={x.id}>{x.indikator} · usia {x.age_group}</option>))}
+                      </select>
+                      <button type="button" className="btn small secondary" disabled={busy === "katalog" || !petaPilihan[m.id]}
+                        onClick={() => void simpanKatalog({ kind: "mapping_add", material_id: m.id, milestone_id: petaPilihan[m.id] }, "Milestone dipetakan ke material.")}>
+                        Petakan
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <h2 style={{ marginTop: 0 }}>Katalog Milestone Perkembangan ({(data.milestones || []).length})</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Milestone baru mulai sebagai <strong>draf</strong>. Tinjau lalu aktifkan supaya tampil penuh di pemilih editor laporan; arsipkan yang tidak dipakai lagi.
+        </p>
+        <div className="form-grid">
+          <div className="field"><label htmlFor="ms-indikator">Indikator *</label>
+            <input id="ms-indikator" value={msForm.indikator} onChange={(e) => setMsForm({ ...msForm, indikator: e.target.value })} placeholder="mis. Mengurutkan benda dari kecil ke besar" /></div>
+          <div className="field"><label htmlFor="ms-usia">Kelompok Usia</label>
+            <select id="ms-usia" value={msForm.age_group} onChange={(e) => setMsForm({ ...msForm, age_group: e.target.value })}>
+              {USIA_MS.map((u) => (<option key={u} value={u}>{u} tahun</option>))}
+            </select></div>
+          <div className="field"><label htmlFor="ms-aspek">Aspek STPPA</label>
+            <select id="ms-aspek" value={msForm.aspect} onChange={(e) => setMsForm({ ...msForm, aspect: e.target.value })}>
+              {Object.entries(LABEL_ASPEK_MS).map(([v, l]) => (<option key={v} value={v}>{l}</option>))}
+            </select></div>
+          <div className="field"><label htmlFor="ms-area">Area Montessori</label>
+            <select id="ms-area" value={msForm.montessori_area} onChange={(e) => setMsForm({ ...msForm, montessori_area: e.target.value })}>
+              <option value="">Tidak terikat area</option>
+              {Object.entries(LABEL_AREA).map(([v, l]) => (<option key={v} value={v}>{l}</option>))}
+            </select></div>
+        </div>
+        <div className="row" style={{ marginTop: 8 }}>
+          <button type="button" className="btn small" disabled={busy === "katalog" || msForm.indikator.trim().length < 5}
+            onClick={async () => { if (await simpanKatalog({ kind: "milestone_create", ...msForm }, "Milestone ditambahkan sebagai draf.")) setMsForm({ indikator: "", age_group: "3-<4", aspect: "kognitif", montessori_area: "" }); }}>
+            + Tambah Milestone (Draf)
+          </button>
+        </div>
+
+        {(data.milestones || []).length > 0 ? (
+          <div style={{ overflowX: "auto", marginTop: 12 }}>
+            <table className="table">
+              <thead><tr><th>Indikator</th><th>Usia</th><th>Aspek</th><th>Area</th><th>Status</th><th>Aksi</th></tr></thead>
+              <tbody>
+                {(data.milestones || []).map((m) => (
+                  <tr key={m.id}>
+                    <td>{m.indikator}</td>
+                    <td>{m.age_group}</td>
+                    <td>{LABEL_ASPEK_MS[m.aspect] || m.aspect}</td>
+                    <td>{m.montessori_area ? (LABEL_AREA[m.montessori_area] || m.montessori_area) : "-"}</td>
+                    <td><StatusBadge status={m.status} /></td>
+                    <td>
+                      <span className="row">
+                        {m.status !== "aktif" ? (
+                          <button type="button" className="btn small secondary" disabled={busy === "katalog"}
+                            onClick={() => void simpanKatalog({ kind: "milestone_status", id: m.id, status: "aktif" }, "Milestone diaktifkan.")}>Aktifkan</button>
+                        ) : null}
+                        {m.status === "aktif" ? (
+                          <button type="button" className="btn small secondary" disabled={busy === "katalog"}
+                            onClick={() => void simpanKatalog({ kind: "milestone_status", id: m.id, status: "draf" }, "Milestone dikembalikan ke draf.")}>Ke Draf</button>
+                        ) : null}
+                        {m.status !== "arsip" ? (
+                          <button type="button" className="btn small danger" disabled={busy === "katalog"}
+                            onClick={() => void simpanKatalog({ kind: "milestone_status", id: m.id, status: "arsip" }, "Milestone diarsipkan.")}>Arsipkan</button>
+                        ) : null}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : null}
       </div>
