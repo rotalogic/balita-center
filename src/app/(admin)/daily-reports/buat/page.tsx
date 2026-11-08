@@ -13,11 +13,14 @@ type Meta = {
   branches: Array<{ id: string; name: string }>;
   classes: Array<{ id: string; branch_id: string; name: string }>;
   staff: Array<{ id: string; branch_id: string; full_name: string; position: string }>;
+  materials: Array<{ id: string; name: string; name_en: string | null; area: string; age_group: string | null }>;
+  milestones: Array<{ id: string; indikator: string; age_group: string; aspect: string; montessori_area: string | null; status: string }>;
+  materialMilestones: Array<{ material_id: string; milestone_id: string }>;
 };
 type Child = { id: string; full_name: string; branch_name: string };
 type GaleriItem = { url: string; media_type: "image" | "video"; mime_type?: string; poster_url?: string };
-type Activity = { title: string; apparatus: string; area: string; rating: string; photo_url: string; activity_time: string; notes: string; work_location: string; work_mode: string };
-const emptyActivity: Activity = { title: "", apparatus: "", area: "", rating: "4", photo_url: "", activity_time: "", notes: "", work_location: "", work_mode: "" };
+type Activity = { title: string; apparatus: string; area: string; rating: string; photo_url: string; activity_time: string; notes: string; work_location: string; work_mode: string; material_id: string; milestone_id: string };
+const emptyActivity: Activity = { title: "", apparatus: "", area: "", rating: "4", photo_url: "", activity_time: "", notes: "", work_location: "", work_mode: "", material_id: "", milestone_id: "" };
 const AREA_OPSI = [["practical_life", "Practical Life"], ["language", "Language"], ["sensorial", "Sensorial"], ["mathematics", "Mathematics"], ["cultural", "Cultural"], ["observasi", "Observasi"]];
 const LOKASI_OPSI = [["lantai", "Lantai"], ["meja", "Meja"], ["alas", "Alas Kerja"]];
 const MODE_OPSI = [["sendiri", "Sendiri"], ["berpasangan", "Berpasangan"], ["kelompok_kecil", "Kelompok Kecil"], ["kelompok_besar", "Kelompok Besar"]];
@@ -26,7 +29,7 @@ const NAP = [["buruk", "Buruk"], ["cukup", "Cukup"], ["baik", "Baik"], ["sangat_
 const MOODS = [["sedih", "😢 Sedih"], ["cemas", "😟 Cemas"], ["biasa", "😐 Biasa"], ["ceria", "😊 Ceria"], ["sangat_ceria", "😄 Sangat Ceria"]];
 
 export default function BuatDailyReportPage() {
-  const [meta, setMeta] = useState<Meta>({ branches: [], classes: [], staff: [] });
+  const [meta, setMeta] = useState<Meta>({ branches: [], classes: [], staff: [], materials: [], milestones: [], materialMilestones: [] });
   const [children, setChildren] = useState<Child[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string>>({ report_date: new Date().toISOString().slice(0, 10), meal_level: "banyak", snack_level: "banyak", nap_quality: "baik", mood: "ceria" });
@@ -114,6 +117,8 @@ export default function BuatDailyReportPage() {
                 notes: String(a.notes ?? ""),
                 work_location: String(a.work_location ?? ""),
                 work_mode: String(a.work_mode ?? ""),
+                material_id: String(a.material_id ?? ""),
+                milestone_id: String(a.milestone_id ?? ""),
               }))
             : [{ ...emptyActivity }]
         );
@@ -152,7 +157,7 @@ export default function BuatDailyReportPage() {
       if (!simpan) return;
       const isi = JSON.parse(simpan) as { form?: Record<string, string>; activities?: typeof activities; gallery?: GaleriItem[]; photoUrls?: string[] };
       if (isi.form) setForm((p) => ({ ...p, ...isi.form }));
-      if (isi.activities?.length) setActivities(isi.activities);
+      if (isi.activities?.length) setActivities(isi.activities.map((x) => ({ ...emptyActivity, ...x })));
       if (isi.gallery?.length) setGallery(isi.gallery);
       else if (isi.photoUrls?.length) setGallery(isi.photoUrls.filter(Boolean).map((url) => ({ url, media_type: "image" as const })));
       setDipulihkan(true);
@@ -175,6 +180,44 @@ export default function BuatDailyReportPage() {
 
   const setActivity = (i: number, patch: Partial<Activity>) =>
     setActivities((prev) => prev.map((a, idx) => (idx === i ? { ...a, ...patch } : a)));
+
+  // Pemilih katalog: material mengikuti area aktivitas; milestone diprioritaskan
+  // dari pemetaan material, lalu area Montessori, terakhir seluruh katalog.
+  const materialTersedia = (a: Activity) => (a.area ? meta.materials.filter((m) => m.area === a.area) : meta.materials);
+  const milestoneTerkait = (a: Activity) =>
+    a.material_id ? meta.materialMilestones.filter((mm) => mm.material_id === a.material_id).map((mm) => mm.milestone_id) : [];
+  const milestoneTersedia = (a: Activity) => {
+    const terkait = milestoneTerkait(a);
+    if (terkait.length > 0) return meta.milestones.filter((m) => terkait.includes(m.id));
+    if (a.area && a.area !== "observasi") {
+      const searea = meta.milestones.filter((m) => m.montessori_area === a.area);
+      if (searea.length > 0) return searea;
+    }
+    return meta.milestones;
+  };
+  const pilihMaterial = (i: number, id: string) => {
+    if (!id) { setActivity(i, { material_id: "" }); return; }
+    const m = meta.materials.find((x) => x.id === id);
+    if (!m) return;
+    const a = activities[i];
+    const terkait = meta.materialMilestones.filter((mm) => mm.material_id === id).map((mm) => mm.milestone_id);
+    setActivity(i, {
+      material_id: id,
+      apparatus: m.name,
+      area: m.area,
+      milestone_id: a.milestone_id && (terkait.length === 0 || terkait.includes(a.milestone_id)) ? a.milestone_id : "",
+    });
+  };
+  const ketikAparatus = (i: number, v: string) => {
+    const a = activities[i];
+    const m = meta.materials.find((x) => x.id === a.material_id);
+    setActivity(i, { apparatus: v, material_id: m && m.name === v ? a.material_id : "" });
+  };
+  const gantiArea = (i: number, v: string) => {
+    const a = activities[i];
+    const m = meta.materials.find((x) => x.id === a.material_id);
+    setActivity(i, { area: v, material_id: m && m.area === v ? a.material_id : "" });
+  };
 
   async function unggahFoto(files: FileList | null, target: { kind: "galeri" } | { kind: "aktivitas"; index: number }) {
     if (!files || files.length === 0) return;
@@ -361,11 +404,25 @@ export default function BuatDailyReportPage() {
                 <div className="form-grid" style={{ marginTop: 8 }}>
                   <div className="field"><label>Judul Aktivitas</label><input placeholder="Mengenal warna dan bentuk" value={a.title} onChange={(e) => setActivity(i, { title: e.target.value })} /></div>
                   <div className="field"><label>Jam</label><TimeInput value={a.activity_time} label={`Jam aktivitas ${i + 1}`} onChange={(v) => setActivity(i, { activity_time: v })} /></div>
-                  <div className="field"><label>Aparatus (syarat terbit)</label><input placeholder="Kartu warna Montessori" value={a.apparatus} onChange={(e) => setActivity(i, { apparatus: e.target.value })} /></div>
+                  <div className="field"><label>Aparatus (syarat terbit)</label><input placeholder="Kartu warna Montessori" value={a.apparatus} onChange={(e) => ketikAparatus(i, e.target.value)} /></div>
                   <div className="field"><label>Rating 1–4 Bintang (syarat terbit)</label><input type="number" min="1" max="4" value={a.rating} onChange={(e) => setActivity(i, { rating: e.target.value })} /></div>
-                  <div className="field"><label>Area Montessori</label><select value={a.area} onChange={(e) => setActivity(i, { area: e.target.value })}><option value="">Pilih area</option>{AREA_OPSI.map(([v, label]) => (<option key={v} value={v}>{label}</option>))}</select></div>
+                  <div className="field"><label>Area Montessori</label><select value={a.area} onChange={(e) => gantiArea(i, e.target.value)}><option value="">Pilih area</option>{AREA_OPSI.map(([v, label]) => (<option key={v} value={v}>{label}</option>))}</select></div>
                   <div className="field"><label>Lokasi Kerja</label><select value={a.work_location} onChange={(e) => setActivity(i, { work_location: e.target.value })}><option value="">Pilih lokasi</option>{LOKASI_OPSI.map(([v, label]) => (<option key={v} value={v}>{label}</option>))}</select></div>
                   <div className="field"><label>Mode Kerja</label><select value={a.work_mode} onChange={(e) => setActivity(i, { work_mode: e.target.value })}><option value="">Pilih mode</option>{MODE_OPSI.map(([v, label]) => (<option key={v} value={v}>{label}</option>))}</select></div>
+                  <div className="field"><label>Material — Katalog AMI</label>
+                    <select value={a.material_id} onChange={(e) => pilihMaterial(i, e.target.value)}>
+                      <option value="">Ketik bebas (tanpa katalog)</option>
+                      {materialTersedia(a).map((m) => (<option key={m.id} value={m.id}>{m.name}{m.age_group ? ` · usia ${m.age_group}` : ""}</option>))}
+                    </select>
+                    {a.material_id && milestoneTerkait(a).length > 0 ? <small className="muted">Material ini terhubung ke {milestoneTerkait(a).length} milestone di kolom sebelah.</small> : null}
+                  </div>
+                  <div className="field"><label>Milestone Perkembangan</label>
+                    <select value={a.milestone_id} onChange={(e) => setActivity(i, { milestone_id: e.target.value })}>
+                      <option value="">Tidak diamati khusus</option>
+                      {milestoneTersedia(a).map((m) => (<option key={m.id} value={m.id}>{m.indikator} · usia {m.age_group}{m.status === "draf" ? " (draf)" : ""}</option>))}
+                    </select>
+                    {a.milestone_id ? <small className="muted">Bintang aktivitas ini tercatat sebagai tingkat capaian milestone di riwayat perkembangan anak.</small> : null}
+                  </div>
                   <div className="field">
                     <label>Foto Aktivitas</label>
                     <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => void unggahFoto(e.target.files, { kind: "aktivitas", index: i })} />

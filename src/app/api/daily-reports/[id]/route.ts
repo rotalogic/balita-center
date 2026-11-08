@@ -250,6 +250,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
           ]
         );
       }
+      // Samakan riwayat observasi milestone dengan isi aktivitas terbaru.
+      await query("DELETE FROM milestone_observations WHERE report_id = $1", [params.id]);
+      const tanggalObs = String(body.report_date || sebelum.report_date || "").slice(0, 10);
+      for (const activity of body.activities) {
+        if (!activity.title || !activity.milestone_id || !tanggalObs) continue;
+        await query(
+          `INSERT INTO milestone_observations (child_id, milestone_id, observed_on, level, report_id, material_id, created_by)
+           VALUES ($1,$2::uuid,$3,$4,$5,$6::uuid,$7::uuid)`,
+          [sebelum.child_id, activity.milestone_id, tanggalObs, activity.rating || null, params.id, activity.material_id || null, sebelum.created_by || null]
+        );
+      }
     }
 
     if (Array.isArray(body.photos)) {

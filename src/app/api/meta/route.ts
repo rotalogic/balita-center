@@ -10,13 +10,17 @@ export async function GET() {
   const denied = await guard("dashboard.view");
   if (denied.error) return denied.error;
   try {
-    const [branches, programs, classes, staff] = await Promise.all([
+    const [branches, programs, classes, staff, materials, milestones, materialMilestones] = await Promise.all([
       query("SELECT id, code, name FROM branches WHERE deleted_at IS NULL ORDER BY name"),
       query("SELECT id, code, name, monthly_fee FROM programs WHERE deleted_at IS NULL ORDER BY name"),
       query("SELECT id, branch_id, program_id, name FROM classes WHERE deleted_at IS NULL ORDER BY name"),
       query("SELECT id, branch_id, full_name, position FROM staff WHERE deleted_at IS NULL ORDER BY full_name"),
+      // Katalog Montessori AMI + milestone untuk pemilih di editor laporan.
+      query("SELECT id, name, name_en, area, age_group FROM materials WHERE is_active ORDER BY area, name"),
+      query("SELECT id, indikator, age_group, aspect, montessori_area, status FROM milestones WHERE status <> 'arsip' ORDER BY age_group, indikator"),
+      query("SELECT material_id, milestone_id FROM material_milestones"),
     ]);
-    return NextResponse.json({ ok: true, branches, programs, classes, staff });
+    return NextResponse.json({ ok: true, branches, programs, classes, staff, materials, milestones, materialMilestones });
   } catch (error) {
     return NextResponse.json({ ok: false, error: dbErrorMessage(error) }, { status: 503 });
   }

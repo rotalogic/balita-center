@@ -173,6 +173,16 @@ export async function POST(request: Request) {
         ]
       );
     }
+    // Aktivitas yang memilih milestone ikut tercatat sebagai observasi
+    // perkembangan anak (bintang = tingkat capaian).
+    for (const activity of body.activities || []) {
+      if (!activity.title || !activity.milestone_id) continue;
+      await query(
+        `INSERT INTO milestone_observations (child_id, milestone_id, observed_on, level, report_id, material_id, created_by)
+         VALUES ($1,$2::uuid,$3,$4,$5,$6::uuid,$7::uuid)`,
+        [body.child_id, activity.milestone_id, body.report_date, activity.rating || null, reportId, activity.material_id || null, body.created_by || null]
+      );
+    }
     if (Array.isArray(body.photos)) {
       for (const p of body.photos) {
         if (!p.photo_url) continue;

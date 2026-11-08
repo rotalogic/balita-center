@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { EmptyState, ErrorState, LoadingState, PageHead, StatusBadge } from "@/components/chrome";
 import { tanggalPanjang } from "@/lib/format";
+import { labelGizi } from "@/lib/rapor-data";
 
 type Row = Record<string, string | number | null>;
 type Payload = {
@@ -15,6 +16,7 @@ type Payload = {
   health: Row[];
   development: Row[];
   milestones: Row[];
+  observations: Row[];
 };
 
 const TABS = ["Profil Anak", "Pendidikan & STPPA", "Kesehatan", "Laporan & Perkembangan"] as const;
@@ -38,12 +40,51 @@ export default function DetailAnakPage() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<(typeof TABS)[number]>("Profil Anak");
 
-  useEffect(() => {
+  const [staf, setStaf] = useState<Array<{ id: string; full_name: string; position: string }>>([]);
+  const [ukur, setUkur] = useState<Record<string, string>>({ checked_on: new Date().toISOString().slice(0, 10) });
+  const [ukurInfo, setUkurInfo] = useState<string | null>(null);
+  const [ukurError, setUkurError] = useState<string | null>(null);
+  const [ukurBusy, setUkurBusy] = useState(false);
+
+  const muat = useCallback(() => {
     fetch(`/api/children/${params.id}`)
       .then((r) => r.json())
       .then((d) => (d.ok ? setData(d) : setError(d.error)))
       .catch(() => setError("Tidak dapat menghubungi server."));
   }, [params.id]);
+
+  useEffect(() => {
+    muat();
+    fetch("/api/meta")
+      .then((r) => r.json())
+      .then((d) => (d.ok ? setStaf(d.staff || []) : null))
+      .catch(() => null);
+  }, [muat]);
+
+  const setU = (k: string, v: string) => setUkur((p) => ({ ...p, [k]: v }));
+
+  async function simpanUkur() {
+    setUkurBusy(true);
+    setUkurInfo(null);
+    setUkurError(null);
+    const res = await fetch(`/api/children/${params.id}/health`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ukur),
+    });
+    const d = await res.json();
+    setUkurBusy(false);
+    if (!d.ok) { setUkurError(d.error || "Gagal mencatat pemeriksaan."); return; }
+    setUkur({ checked_on: new Date().toISOString().slice(0, 10) });
+    setUkurInfo("Pemeriksaan tercatat. Hasil ukur terbaru ikut tampil di Balita Connect dan panel Tumbuh Kembang rapor.");
+    muat();
+  }
+
+  async function hapusUkur(checkId: string) {
+    if (!window.confirm("Hapus catatan pemeriksaan ini?")) return;
+    const res = await fetch(`/api/children/${params.id}/health?check_id=${checkId}`, { method: "DELETE" });
+    const d = await res.json();
+    if (d.ok) muat();
+    else setUkurError(d.error || "Gagal menghapus catatan.");
+  }
 
   if (error) return (<><PageHead title="Detail Anak Didik" /><ErrorState message={error} /></>);
   if (!data) return (<><PageHead title="Detail Anak Didik" /><LoadingState /></>);
@@ -150,20 +191,36 @@ export default function DetailAnakPage() {
           </article>
           <article className="card">
             <h2>Milestone</h2>
-            {data.milestones.length === 0 ? (
-              <EmptyState title="Belum ada milestone tercatat" body="Milestone anak dari tabel student_milestones tampil di sini begitu guru mencatatnya." />
-            ) : (
+            {data.observations.length > 0 ? (
+              <>
+                <h3 style={{ marginTop: 0 }}>Observasi dari Laporan Harian</h3>
+                <ul className="timeline">
+                  {data.observations.map((o) => (
+                    <li key={String(o.id)}>
+                      <time>{String(o.observed_on || "")}</time>
+                      <div>{String(o.indikator)}
+                        <div className="muted">Usia {String(o.age_group || "-")}{o.level ? <> · Capaian {"★".repeat(Number(o.level))}{"☆".repeat(4 - Number(o.level))}</> : null}</div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
+            {data.milestones.length === 0 && data.observations.length === 0 ? (
+              <EmptyState title="Belum ada milestone tercatat" body="Pilih milestone pada aktivitas Observasi (atau material terkait) di editor laporan harian — capaiannya tercatat otomatis di sini." />
+            ) : data.milestones.length > 0 ? (
               <ul className="timeline">
                 {data.milestones.map((m) => (
                   <li key={String(m.id)}><time>{String(m.achieved_on || "")}</time><div><strong>{String(m.title)}</strong><div className="muted">{String(m.category || "")} · {String(m.notes || "")}</div></div></li>
                 ))}
               </ul>
-            )}
+            ) : null}
           </article>
         </section>
       ) : null}
 
       {tab === "Kesehatan" ? (
+        <>
         <section className="grid two">
           <article className="card">
             <h2>Informasi Kesehatan</h2>
@@ -176,16 +233,66 @@ export default function DetailAnakPage() {
           <article className="card">
             <h2>Riwayat Pemeriksaan</h2>
             {data.health.length === 0 ? (
-              <EmptyState title="Belum ada pemeriksaan" body="Catatan pemeriksaan kesehatan anak tampil di sini setelah ditambahkan guru atau tenaga kesehatan." />
+              <EmptyState title="Belum ada pemeriksaan" body="Catat hasil ukur pertama lewat formulir di bawah — berat, tinggi, dan lingkar kepala mengisi panel Tumbuh Kembang di rapor." />
             ) : (
               <ul className="timeline">
                 {data.health.map((h) => (
-                  <li key={String(h.id)}><time>{String(h.checked_on)}</time><div>{String(h.condition || "Pemeriksaan rutin")}<div className="muted">{String(h.weight_kg || "-")} kg · {String(h.height_cm || "-")} cm · {String(h.temperature_c || "-")}°C</div></div></li>
+                  <li key={String(h.id)}>
+                    <time>{String(h.checked_on)}</time>
+                    <div>
+                      {String(h.condition || "Pemeriksaan rutin")}
+                      <div className="muted">
+                        {String(h.weight_kg || "-")} kg · {String(h.height_cm || "-")} cm · LK {String(h.head_circumference_cm || "-")} cm · {String(h.temperature_c || "-")}°C
+                        {h.nutrition_status ? <> · Status gizi: <strong>{labelGizi(String(h.nutrition_status))}</strong></> : null}
+                      </div>
+                      <button type="button" className="btn small danger" style={{ marginTop: 4 }} onClick={() => void hapusUkur(String(h.id))}>Hapus</button>
+                    </div>
+                  </li>
                 ))}
               </ul>
             )}
           </article>
         </section>
+
+        <article className="card" style={{ marginTop: 16 }}>
+          <h2>Catat Pemeriksaan Baru</h2>
+          {ukurInfo ? <p className="success" role="status">{ukurInfo}</p> : null}
+          {ukurError ? <p className="error" role="alert">{ukurError}</p> : null}
+          <div className="form-grid">
+            <div className="field"><label htmlFor="uk-tanggal">Tanggal *</label>
+              <input id="uk-tanggal" type="date" value={ukur.checked_on || ""} onChange={(e) => setU("checked_on", e.target.value)} /></div>
+            <div className="field"><label htmlFor="uk-berat">Berat Badan (kg)</label>
+              <input id="uk-berat" type="number" step="0.1" min="0" placeholder="mis. 13,8" value={ukur.weight_kg || ""} onChange={(e) => setU("weight_kg", e.target.value)} /></div>
+            <div className="field"><label htmlFor="uk-tinggi">Tinggi Badan (cm)</label>
+              <input id="uk-tinggi" type="number" step="0.1" min="0" placeholder="mis. 101,4" value={ukur.height_cm || ""} onChange={(e) => setU("height_cm", e.target.value)} /></div>
+            <div className="field"><label htmlFor="uk-lk">Lingkar Kepala (cm)</label>
+              <input id="uk-lk" type="number" step="0.1" min="0" placeholder="mis. 49,2" value={ukur.head_circumference_cm || ""} onChange={(e) => setU("head_circumference_cm", e.target.value)} /></div>
+            <div className="field"><label htmlFor="uk-suhu">Suhu (°C)</label>
+              <input id="uk-suhu" type="number" step="0.1" min="0" placeholder="mis. 36,6" value={ukur.temperature_c || ""} onChange={(e) => setU("temperature_c", e.target.value)} /></div>
+            <div className="field"><label htmlFor="uk-gizi">Status Gizi</label>
+              <select id="uk-gizi" value={ukur.nutrition_status || ""} onChange={(e) => setU("nutrition_status", e.target.value)}>
+                <option value="">Belum dinilai</option>
+                <option value="gizi_baik">Gizi Baik</option>
+                <option value="gizi_kurang">Gizi Kurang</option>
+                <option value="gizi_lebih">Gizi Lebih</option>
+                <option value="obesitas">Obesitas</option>
+                <option value="stunting">Stunting</option>
+              </select></div>
+            <div className="field"><label htmlFor="uk-kondisi">Kondisi</label>
+              <input id="uk-kondisi" type="text" placeholder="mis. Sehat / Batuk ringan" value={ukur.condition || ""} onChange={(e) => setU("condition", e.target.value)} /></div>
+            <div className="field"><label htmlFor="uk-pemeriksa">Diperiksa oleh</label>
+              <select id="uk-pemeriksa" value={ukur.checked_by || ""} onChange={(e) => setU("checked_by", e.target.value)}>
+                <option value="">Pilih staf</option>
+                {staf.map((s) => (<option key={s.id} value={s.id}>{s.full_name} — {s.position}</option>))}
+              </select></div>
+            <div className="field"><label htmlFor="uk-catatan">Catatan</label>
+              <input id="uk-catatan" type="text" placeholder="Catatan tambahan (opsional)" value={ukur.notes || ""} onChange={(e) => setU("notes", e.target.value)} /></div>
+          </div>
+          <div className="row" style={{ marginTop: 12 }}>
+            <button type="button" className="btn" disabled={ukurBusy} onClick={() => void simpanUkur()}>{ukurBusy ? "Menyimpan…" : "Simpan Pemeriksaan"}</button>
+          </div>
+        </article>
+        </>
       ) : null}
 
       {tab === "Laporan & Perkembangan" ? (

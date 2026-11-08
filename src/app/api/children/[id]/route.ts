@@ -13,7 +13,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     if (child.length === 0) {
       return NextResponse.json({ ok: false, error: "Anak tidak ditemukan." }, { status: 404 });
     }
-    const [guardians, enrollment, reports, health, development, milestones] = await Promise.all([
+    const [guardians, enrollment, reports, health, development, milestones, observations] = await Promise.all([
       query(
         `SELECT g.* FROM child_guardians cg JOIN guardians g ON g.id = cg.guardian_id
           WHERE cg.child_id = $1 ORDER BY cg.is_primary DESC`,
@@ -29,8 +29,14 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       query("SELECT * FROM health_checks WHERE child_id = $1 ORDER BY checked_on DESC LIMIT 5", [params.id]),
       query("SELECT * FROM child_development_records WHERE child_id = $1 ORDER BY recorded_on DESC LIMIT 3", [params.id]),
       query("SELECT * FROM student_milestones WHERE child_id = $1 ORDER BY achieved_on DESC LIMIT 10", [params.id]),
+      query(
+        `SELECT mo.id, mo.observed_on, mo.level, m.indikator, m.age_group, m.aspect
+           FROM milestone_observations mo JOIN milestones m ON m.id = mo.milestone_id
+          WHERE mo.child_id = $1 ORDER BY mo.observed_on DESC, mo.created_at DESC LIMIT 10`,
+        [params.id]
+      ),
     ]);
-    return NextResponse.json({ ok: true, child: child[0], guardians, enrollment: enrollment[0] || null, reports, health, development, milestones });
+    return NextResponse.json({ ok: true, child: child[0], guardians, enrollment: enrollment[0] || null, reports, health, development, milestones, observations });
   } catch (error) {
     return NextResponse.json({ ok: false, error: dbErrorMessage(error) }, { status: 503 });
   }
