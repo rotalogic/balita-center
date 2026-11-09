@@ -610,3 +610,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS payments_gateway_order_unik
 -- (manual maupun gateway) gagal saat status diperbarui, padahal pembayaran
 -- sudah tercatat. varchar(24) memberi ruang aman.
 ALTER TABLE invoices ALTER COLUMN status TYPE varchar(24);
+-- Migrasi: catat kapan pengguna terakhir masuk.
+-- Dipakai halaman Pengguna untuk melihat akun yang tidak aktif.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at timestamptz;

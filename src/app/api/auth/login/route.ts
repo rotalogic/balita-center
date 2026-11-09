@@ -100,6 +100,7 @@ export async function POST(request: Request) {
     }
 
     percobaan.delete(kunci);
+    await query("UPDATE users SET last_login_at = now() WHERE id = $1", [user.id]).catch(() => null);
     await catatAudit({ id: user.id }, {
       action: "auth.login",
       entityTable: "users",

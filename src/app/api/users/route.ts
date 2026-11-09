@@ -34,6 +34,7 @@ export async function GET() {
     const users = await query<UserRow>(
       `SELECT u.id, u.full_name, u.email, u.role, u.phone, u.status, u.organization_name,
               u.is_active, u.totp_enabled, u.created_at,
+              to_char(u.last_login_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD"T"HH24:MI') AS last_login_wib,
               (SELECT string_agg(b.name, ', ') FROM user_branches ub JOIN branches b ON b.id = ub.branch_id
                 WHERE ub.user_id = u.id) AS branch_names,
               (SELECT s.id FROM staff s WHERE s.user_id = u.id LIMIT 1) AS staff_id,

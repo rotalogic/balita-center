@@ -41,6 +41,7 @@ psql "$DATABASE_URL" -f database/migrasi-gateway.sql
 psql "$DATABASE_URL" -f database/migrasi-identitas.sql
 psql "$DATABASE_URL" -f database/migrasi-gateway-order.sql
 psql "$DATABASE_URL" -f database/migrasi-status-tagihan.sql
+psql "$DATABASE_URL" -f database/migrasi-pengguna-login.sql
 ```
 
 Semua migrasi memakai `IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`,

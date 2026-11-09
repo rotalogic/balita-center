@@ -13,6 +13,7 @@ type UserRow = {
   is_active: boolean;
   totp_enabled: boolean;
   created_at: string;
+  last_login_wib: string | null;
   branch_names: string | null;
   staff_id: string | null;
   staff_name: string | null;
@@ -33,6 +34,7 @@ export default function PenggunaPage() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [cari, setCari] = useState("");
   const [invite, setInvite] = useState({ full_name: "", email: "", role: "orang_tua", branch_id: "", organization_name: "" });
   const [activation, setActivation] = useState<string | null>(null);
 
@@ -156,11 +158,16 @@ export default function PenggunaPage() {
         Kolom <strong>Akun Staf</strong> menautkan akun login ke baris staf — wajib sebelum staf bisa mengajukan cuti
         atau memutuskan cuti. Satu staf hanya boleh punya satu akun.
       </p>
-      <div className="card table-wrap" style={{ marginTop: 16 }}>
+      <div style={{ marginTop: 16, maxWidth: 420 }}>
+        <input aria-label="Cari pengguna" placeholder="Cari nama atau email pengguna…" value={cari} onChange={(e) => setCari(e.target.value)} />
+      </div>
+      <div className="card table-wrap" style={{ marginTop: 10 }}>
         <table>
-          <thead><tr><th>Nama</th><th>Email</th><th>Peran</th><th>Cabang</th><th>Akun Staf</th><th>Status</th><th>Aksi</th></tr></thead>
+          <thead><tr><th>Nama</th><th>Email</th><th>Peran</th><th>Cabang</th><th>Akun Staf</th><th>Status</th><th>Terakhir Masuk</th><th>Aksi</th></tr></thead>
           <tbody>
-            {data.users.map((u) => (
+            {data.users
+              .filter((u) => !cari || `${u.full_name} ${u.email}`.toLowerCase().includes(cari.toLowerCase()))
+              .map((u) => (
               <tr key={u.id}>
                 <td><strong>{u.full_name}</strong>{u.totp_enabled ? <span className="muted"> · 2FA</span> : null}</td>
                 <td>{u.email}</td>
@@ -190,6 +197,7 @@ export default function PenggunaPage() {
                   {u.staff_name ? <div className="muted" style={{ fontSize: 11 }}>tertaut</div> : null}
                 </td>
                 <td>{STATUS_LABEL[u.status] || u.status}</td>
+                <td className="muted" style={{ whiteSpace: "nowrap", fontSize: 12.5 }}>{u.last_login_wib ? `${u.last_login_wib.replace("T", " · ")} WIB` : "Belum pernah"}</td>
                 <td>
                   <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
                     {u.status === "menunggu_persetujuan" ? (
