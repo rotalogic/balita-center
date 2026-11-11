@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { EmptyState, ErrorState, LoadingState, PageHead, StatusBadge } from "@/components/chrome";
 import { tanggalPanjang, jamRapi } from "@/lib/format";
+import { kirimJson } from "@/lib/http";
 
 type Row = Record<string, string | number | boolean | null>;
 type Data = {
@@ -22,6 +23,181 @@ type Status = {
   last_outbound: { created_at: string; delivery_status: string | null } | null;
   outbound: { total: number; gagal: number };
 };
+
+
+type DataWa = {
+  provider: string; aktif: boolean; baseUrl: string; sessionId: string;
+  apiKeyMasker: string | null; apiKeyTerisi: boolean;
+  statusGateway: { terhubung: boolean; status: string; nama?: string } | null;
+  antrean: { antre: number; terkirim: number; gagal: number; hitungan_batch: number; jeda_sampai: string | null; terakhir_kirim_at: string | null };
+};
+
+// Kartu Gateway WhatsApp OpenWA: provider pesan keluar Ailsa dapat dipilih
+// antara Meta Cloud API (resmi) dan OpenWA (gateway mandiri). Pesan lewat
+// OpenWA selalu masuk antrean beritme: teks divariasikan per pesan, jeda
+// 10 detik antar pesan, jeda 10 menit sesudah 10 pesan.
+function KartuOpenWa() {
+  const [data, setData] = useState<DataWa | null>(null);
+  const [form, setForm] = useState({ provider: "meta", baseUrl: "", apiKey: "", sessionId: "", aktif: false });
+  const [uji, setUji] = useState({ nomor: "", nama: "Ibu Sari", teks: "{salam}, {nama}. {Ini pengingat|Sekadar mengingatkan|Kami informasikan} bahwa laporan harian anak sudah terbit di Balita Connect." });
+  const [contoh, setContoh] = useState<string[]>([]);
+  const [pesan, setPesan] = useState<{ ok: boolean; text: string } | null>(null);
+  const [sibuk, setSibuk] = useState(false);
+
+  const muat = useCallback(async () => {
+    const r = await fetch("/api/ailsa/wa");
+    const d = await r.json();
+    if (d.ok) {
+      setData(d as DataWa);
+      setForm((f) => ({ ...f, provider: d.provider, baseUrl: d.baseUrl || "", sessionId: d.sessionId || "", aktif: Boolean(d.aktif) }));
+    }
+  }, []);
+  useEffect(() => { void muat(); }, [muat]);
+
+  async function kirim(body: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const { data: d } = await kirimJson("/api/ailsa/wa", "POST", body);
+    return d as Record<string, unknown>;
+  }
+
+  async function simpan() {
+    setSibuk(true); setPesan(null);
+    const d = await kirim({ aksi: "simpan", ...form });
+    setSibuk(false);
+    if (!d.ok) return setPesan({ ok: false, text: String(d.error || "Gagal menyimpan pengaturan WA.") });
+    setPesan({ ok: true, text: "Pengaturan gateway WhatsApp tersimpan." });
+    setForm((f) => ({ ...f, apiKey: "" }));
+    void muat();
+  }
+
+  async function pratinjau() {
+    setSibuk(true); setPesan(null);
+    const d = await kirim({ aksi: "pratinjau", teks: uji.teks, nama: uji.nama });
+    setSibuk(false);
+    if (!d.ok) return setPesan({ ok: false, text: String(d.error || "Pratinjau gagal.") });
+    setContoh((d.contoh as string[]) || []);
+  }
+
+  async function masukAntrean() {
+    setSibuk(true); setPesan(null);
+    const d = await kirim({ aksi: "uji", nomor: uji.nomor, teks: uji.teks, nama: uji.nama });
+    setSibuk(false);
+    if (!d.ok) return setPesan({ ok: false, text: String(d.error || "Gagal memasukkan antrean.") });
+    setPesan({ ok: true, text: "Pesan uji masuk antrean. Prosesor akan mengirimnya mengikuti ritme (jeda 10 detik, jeda kelompok 10 menit)." });
+    void muat();
+  }
+
+  async function proses() {
+    setSibuk(true); setPesan(null);
+    const d = await kirim({ aksi: "proses" });
+    setSibuk(false);
+    if (!d.ok) return setPesan({ ok: false, text: String(d.error || "Prosesor gagal berjalan.") });
+    const status = String(d.status || "");
+    const arti: Record<string, string> = {
+      terkirim: `Satu pesan terkirim ke ${String(d.tujuan || "")}.`,
+      antrean_kosong: "Antrean kosong — tidak ada pesan menunggu.",
+      jeda_batch: `Sedang jeda kelompok sampai ${d.sampai ? new Date(String(d.sampai)).toLocaleTimeString("id-ID") : ""}.`,
+      terlalu_cepat: "Terlalu cepat — jeda 10 detik antar pesan belum lewat.",
+      gateway_tidak_siap: "Gateway belum siap (provider/aktif/URL/kunci/sesi belum lengkap).",
+      gagal_sementara: "Pengiriman gagal, pesan kembali ke antrean untuk dicoba lagi.",
+      gagal_permanen: "Pengiriman gagal permanen sesudah 3 percobaan.",
+    };
+    setPesan({ ok: status === "terkirim", text: arti[status] || status });
+    void muat();
+  }
+
+  const a = data?.antrean;
+  return (
+    <article className="card" style={{ marginTop: 12 }}>
+      <h2 style={{ marginTop: 0 }}>Gateway WhatsApp — OpenWA</h2>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Provider pesan keluar dapat dipilih: <strong>Meta Cloud API</strong> (kanal resmi) atau{" "}
+        <strong>OpenWA</strong> (gateway mandiri sumber terbuka, berjalan di server sendiri dan terhubung
+        lewat pemindaian QR seperti WhatsApp Web). OpenWA <strong>bukan</strong> kanal resmi Meta — gunakan
+        nomor khusus yang siap menanggung risiko pembatasan akun, dan hangatkan nomor baru secara wajar.
+      </p>
+      {pesan ? <p className={pesan.ok ? "success" : "error"} role="status">{pesan.text}</p> : null}
+      <div className="form-grid">
+        <div className="field">
+          <label htmlFor="wa-provider">Provider Pesan Keluar</label>
+          <select id="wa-provider" value={form.provider} onChange={(e) => setForm({ ...form, provider: e.target.value })}>
+            <option value="meta">Meta Cloud API (resmi)</option>
+            <option value="openwa">OpenWA (gateway mandiri)</option>
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="wa-aktif">Gateway OpenWA Aktif</label>
+          <select id="wa-aktif" value={form.aktif ? "ya" : "tidak"} onChange={(e) => setForm({ ...form, aktif: e.target.value === "ya" })}>
+            <option value="tidak">Tidak aktif</option>
+            <option value="ya">Aktif — pesan proaktif masuk antrean OpenWA</option>
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="wa-url">Base URL OpenWA</label>
+          <input id="wa-url" placeholder="http://localhost:2785" value={form.baseUrl} onChange={(e) => setForm({ ...form, baseUrl: e.target.value })} />
+        </div>
+        <div className="field">
+          <label htmlFor="wa-sesi">ID Sesi OpenWA</label>
+          <input id="wa-sesi" placeholder="session id dari dashboard OpenWA" value={form.sessionId} onChange={(e) => setForm({ ...form, sessionId: e.target.value })} />
+        </div>
+        <div className="field">
+          <label htmlFor="wa-kunci">Kunci API OpenWA {data?.apiKeyTerisi ? `(tersimpan ${data.apiKeyMasker || ""} — kosongkan bila tidak diubah)` : ""}</label>
+          <input id="wa-kunci" type="password" placeholder="X-API-Key dari dashboard OpenWA" value={form.apiKey} onChange={(e) => setForm({ ...form, apiKey: e.target.value })} />
+        </div>
+      </div>
+      <div className="row" style={{ marginTop: 8 }}>
+        <button type="button" className="btn" disabled={sibuk} onClick={() => void simpan()}>{sibuk ? "Menyimpan…" : "Simpan Pengaturan WA"}</button>
+        {form.baseUrl ? <a className="btn secondary" href={form.baseUrl} target="_blank" rel="noreferrer">Buka Dashboard OpenWA (pasangkan QR di sana)</a> : null}
+      </div>
+      {data ? (
+        <p className="muted" style={{ marginBottom: 0 }}>
+          Status sesi:{" "}
+          {data.statusGateway
+            ? data.statusGateway.terhubung
+              ? <span className="badge ok">Terhubung{data.statusGateway.nama ? ` — ${data.statusGateway.nama}` : ""} ({data.statusGateway.status})</span>
+              : <span className="badge">{data.statusGateway.status}</span>
+            : "— (provider Meta)"}
+          {" · "}Antrean: {a?.antre ?? 0} menunggu · {a?.terkirim ?? 0} terkirim · {a?.gagal ?? 0} gagal
+          {" · "}Kelompok berjalan: {a?.hitungan_batch ?? 0}/10 pesan
+          {a?.jeda_sampai && new Date(a.jeda_sampai).getTime() > Date.now() ? ` · jeda kelompok sampai ${new Date(a.jeda_sampai).toLocaleTimeString("id-ID")}` : ""}
+        </p>
+      ) : null}
+
+      <h3 style={{ marginBottom: 4 }}>Ritme Pengiriman (aturan tetap)</h3>
+      <ul className="muted" style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
+        <li>Setiap pesan <strong>divariasikan</strong>: tulis templat dengan pilihan kata <code>{"{Halo|Hai|Selamat pagi}"}</code> dan placeholder <code>{"{nama}"}</code>, <code>{"{nama_anak}"}</code>, <code>{"{salam}"}</code> — tiap penerima menerima susunan yang berbeda.</li>
+        <li><strong>Jeda 10 detik</strong> antara satu pengiriman dan berikutnya.</li>
+        <li>Sesudah <strong>10 pesan</strong>, prosesor <strong>berhenti 10 menit</strong> sebelum melanjutkan.</li>
+        <li>Prosesor berjalan lewat cron <code>POST /api/jobs/wa</code> (header <code>x-job-token</code>) — sarankan tiap 15 detik — atau tombol proses di bawah. Balasan percakapan bot tidak ikut antrean ini.</li>
+      </ul>
+
+      <h3 style={{ marginBottom: 4 }}>Pesan Uji ke Antrean</h3>
+      <div className="form-grid">
+        <div className="field">
+          <label htmlFor="wa-uji-nomor">Nomor Tujuan (format 628…)</label>
+          <input id="wa-uji-nomor" placeholder="6281234567890" value={uji.nomor} onChange={(e) => setUji({ ...uji, nomor: e.target.value })} />
+        </div>
+        <div className="field">
+          <label htmlFor="wa-uji-nama">Nama untuk {"{nama}"}</label>
+          <input id="wa-uji-nama" value={uji.nama} onChange={(e) => setUji({ ...uji, nama: e.target.value })} />
+        </div>
+      </div>
+      <div className="field">
+        <label htmlFor="wa-uji-teks">Templat Pesan</label>
+        <textarea id="wa-uji-teks" rows={3} style={{ width: "100%" }} value={uji.teks} onChange={(e) => setUji({ ...uji, teks: e.target.value })} />
+      </div>
+      <div className="row" style={{ marginTop: 8 }}>
+        <button type="button" className="btn secondary" disabled={sibuk} onClick={() => void pratinjau()}>Pratinjau 3 Variasi</button>
+        <button type="button" className="btn secondary" disabled={sibuk} onClick={() => void masukAntrean()}>Masukkan Antrean Uji</button>
+        <button type="button" className="btn" disabled={sibuk} onClick={() => void proses()}>Proses Satu Pesan</button>
+      </div>
+      {contoh.length > 0 ? (
+        <ol className="muted" style={{ marginBottom: 0, lineHeight: 1.7 }}>
+          {contoh.map((c, i) => (<li key={i}>{c}</li>))}
+        </ol>
+      ) : null}
+    </article>
+  );
+}
 
 export function AilsaClient({ bagian }: { bagian?: string }) {
   const [data, setData] = useState<Data | null>(null);
@@ -325,6 +501,7 @@ export function AilsaClient({ bagian }: { bagian?: string }) {
         </ul>
       </article>
 
+      <KartuOpenWa />
       <article className="card" style={{ marginTop: 12 }}>
         <h2 style={{ marginTop: 0 }}>Kunci LLM — DeepSeek</h2>
         <p className="muted" style={{ marginTop: 0 }}>

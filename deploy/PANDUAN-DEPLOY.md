@@ -59,6 +59,7 @@ psql "$DATABASE_URL" -f database/migrasi-zkc-tahap2-kalender.sql
 psql "$DATABASE_URL" -f database/migrasi-zkc-tahap2-dokumentasi.sql
 psql "$DATABASE_URL" -f database/migrasi-zkc-tahap2-deteksi.sql
 psql "$DATABASE_URL" -f database/migrasi-absensi-guru.sql
+psql "$DATABASE_URL" -f database/migrasi-wa-openwa.sql
 ```
 
 Sesudah migrasi, muat berkas impor resmi lembaga (salinannya tersimpan di
@@ -219,3 +220,21 @@ di akar repo bila masih ada) perlu ditambahkan lewat web GitHub atau git
 dengan token ber-scope `workflow`, karena token mesin pembangunan tidak
 memiliki scope itu. Ini hanya untuk cek build otomatis di GitHub; tidak
 menghambat deploy.
+
+## Gateway WhatsApp OpenWA (opsional, hanya bila pemilik mengaktifkan)
+
+OpenWA adalah gateway WhatsApp mandiri (bukan kanal resmi Meta) dari
+github.com/rmyndharis/OpenWA. Balita Center hanya menjadi klien API-nya.
+
+1. Jalankan OpenWA di server yang sama (Docker): `ghcr.io/rmyndharis/openwa`
+   (API + dashboard di port 2785). Buat sesi, mulai sesi, pindai QR dari
+   dashboard OpenWA dengan nomor KHUSUS lembaga — jangan nomor pribadi/utama.
+2. Di Balita Center: Ailsa → Kanal & Kunci LLM → kartu "Gateway WhatsApp —
+   OpenWA": pilih provider OpenWA, isi Base URL (mis. http://localhost:2785),
+   ID sesi, kunci API (X-API-Key dari dashboard OpenWA), lalu aktifkan.
+3. Ritme pengiriman tetap dari aplikasi: pesan divariasikan per penerima,
+   jeda 10 detik antar pesan, jeda 10 menit sesudah 10 pesan. Agar antrean
+   berjalan, jadwalkan pemanggil prosesor, misalnya cron tiap 15 detik:
+   `curl -X POST -H "x-job-token: $JOB_TOKEN" https://balita.rotalogic.id/api/jobs/wa`
+4. Mengaktifkan kanal WhatsApp adalah keputusan pemilik; keadaan bawaan
+   tetap nonaktif dan provider bawaan tetap Meta.
