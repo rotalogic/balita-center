@@ -46,7 +46,11 @@ export async function POST(request: Request) {
       isi = isi.split(`{{${k}}}`).join(String(v));
       perihal = perihal.split(`{{${k}}}`).join(String(v));
     }
-    const belum = isi.match(/\{\{[^}]+\}\}/g);
+    // Isi final dari pengguna (mis. hasil generate AI dari poin-poin yang
+    // sudah diperiksa & disunting di formulir) menggantikan hasil template.
+    const isiFinal = String(body.isi_final || "").trim();
+    if (isiFinal) isi = isiFinal.slice(0, 20000);
+    const belum = isiFinal ? [] : isi.match(/\{\{[^}]+\}\}/g);
     const scope = branchScope(denied.user);
     const rows = await query<{ id: string }>(
       `INSERT INTO surat (branch_id, template_id, kode_jenis, perihal, tujuan, isi, variabel, created_by)
@@ -59,7 +63,8 @@ export async function POST(request: Request) {
       ]
     );
     await catatAudit(denied.user, {
-      action: "surat.create", entityTable: "surat", entityId: rows[0].id, detail: { perihal },
+      action: "surat.create", entityTable: "surat", entityId: rows[0].id,
+      detail: { perihal, dari_ai: Boolean(isiFinal) },
     });
     return NextResponse.json({
       ok: true, id: rows[0].id,

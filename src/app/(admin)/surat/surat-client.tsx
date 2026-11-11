@@ -14,6 +14,9 @@ export function SuratClient({ bagian }: { bagian?: string }) {
   const [tplId, setTplId] = useState("");
   const [variabel, setVariabel] = useState<Record<string, string>>({});
   const [tujuan, setTujuan] = useState("");
+  const [poin, setPoin] = useState("");
+  const [isiHasil, setIsiHasil] = useState("");
+  const [sibukGen, setSibukGen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -33,7 +36,7 @@ export function SuratClient({ bagian }: { bagian?: string }) {
     setBusy(true); setError(null); setInfo(null);
     const res = await fetch("/api/surat", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ template_id: tplId, variabel, tujuan: tujuan || undefined }),
+      body: JSON.stringify({ template_id: tplId, variabel, tujuan: tujuan || undefined, isi_final: isiHasil.trim() ? isiHasil : undefined }),
     });
     const d = await res.json();
     setBusy(false);
@@ -42,7 +45,24 @@ export function SuratClient({ bagian }: { bagian?: string }) {
       (d.variabel_belum_terisi?.length ? ` Variabel belum terisi: ${d.variabel_belum_terisi.join(", ")}.` : ""));
     setVariabel({});
     setTujuan("");
+    setPoin("");
+    setIsiHasil("");
     load();
+  }
+
+  async function generate() {
+    if (!tpl) { setError("Pilih template dulu — jenis dan perihal surat diambil dari template."); return; }
+    if (poin.trim().length < 10) { setError("Tulis poin-poin suratnya dulu."); return; }
+    setSibukGen(true); setError(null); setInfo(null);
+    const res = await fetch("/api/surat/generate", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ poin, perihal: tpl.perihal_default || tpl.nama, tujuan: tujuan || undefined, jenis: `${tpl.nama} (${tpl.kode_jenis})` }),
+    });
+    const d = await res.json();
+    setSibukGen(false);
+    if (!d.ok) { setError(d.error); return; }
+    setIsiHasil(String(d.isi || ""));
+    setInfo("Isi surat disusun AI dari poin-poinmu. Periksa dan sunting di kolom hasil di bawah — draf akan memakai teks itu persis.");
   }
 
   return (
@@ -75,8 +95,34 @@ export function SuratClient({ bagian }: { bagian?: string }) {
               <input id={`sr_v_${k}`} value={variabel[k] || ""} onChange={(e) => setVariabel((p) => ({ ...p, [k]: e.target.value }))} />
             </div>
           ))}
+          <div className="field" style={{ marginTop: 14 }}>
+            <label htmlFor="sr_poin">Poin-poin Surat (cara cepat — opsional)</label>
+            <textarea id="sr_poin" rows={5} style={{ width: "100%" }} value={poin} onChange={(e) => setPoin(e.target.value)}
+              placeholder={"Tulis poinnya saja, satu per baris. Contoh:\n- mengundang orang tua kelas CASA\n- sosialisasi kalender akademik semester genap\n- Sabtu, 22 November 2026 pukul 09.00 di aula ZKC\n- mohon konfirmasi kehadiran ke admin"} />
+            <p className="muted" style={{ margin: "4px 0 0" }}>
+              Bila poin diisi, tekan <strong>Generate Surat dengan AI</strong> — DeepSeek (kunci yang sama dengan Ailsa)
+              menyusun isi surat resmi dari poin-poin itu. Hasilnya masih draf: selalu periksa sebelum membuat surat.
+            </p>
+          </div>
+          <div className="row" style={{ gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+            <button className="btn secondary" type="button" disabled={sibukGen || busy || !tplId || poin.trim().length < 10}
+              onClick={() => void generate()}>
+              {sibukGen ? "AI sedang menyusun…" : "Generate Surat dengan AI"}
+            </button>
+            {isiHasil ? (
+              <button className="btn secondary" type="button" disabled={busy} onClick={() => setIsiHasil("")}>
+                Buang Hasil Generate (kembali ke template)
+              </button>
+            ) : null}
+          </div>
+          {isiHasil ? (
+            <div className="field" style={{ marginTop: 10 }}>
+              <label htmlFor="sr_isi_hasil">Isi Surat — hasil generate (periksa &amp; sunting)</label>
+              <textarea id="sr_isi_hasil" rows={12} style={{ width: "100%" }} value={isiHasil} onChange={(e) => setIsiHasil(e.target.value)} />
+            </div>
+          ) : null}
           <button className="btn" type="submit" disabled={busy || !tplId} style={{ marginTop: 10 }}>
-            {busy ? "Menyimpan…" : "Buat Draf Surat"}
+            {busy ? "Menyimpan…" : isiHasil ? "Buat Draf Surat (dengan Isi Hasil Generate)" : "Buat Draf Surat"}
           </button>
         </form>
       </div>

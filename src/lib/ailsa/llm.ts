@@ -96,7 +96,7 @@ function bacaSse(teks: string): string {
 }
 
 async function panggilSatu(opts: {
-  base: string; key: string; model: string; pesan: Pesan[]; suhu: number; jsonMode: boolean; batasMs: number;
+  base: string; key: string; model: string; pesan: Pesan[]; suhu: number; jsonMode: boolean; batasMs: number; maxTokens?: number;
 }): Promise<Jawaban> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), opts.batasMs);
@@ -107,7 +107,7 @@ async function panggilSatu(opts: {
       body: JSON.stringify({
         model: opts.model,
         temperature: opts.suhu,
-        max_tokens: 1200,
+        max_tokens: opts.maxTokens || 1200,
         ...(opts.jsonMode ? { response_format: { type: "json_object" } } : {}),
         messages: opts.pesan,
       }),
@@ -139,25 +139,25 @@ async function panggilSatu(opts: {
   }
 }
 
-export async function panggilLLM(pesan: Pesan[], suhu = 0.3): Promise<Jawaban> {
+export async function panggilLLM(pesan: Pesan[], suhu = 0.3, modeJson = true, maxTokens = 1200): Promise<Jawaban> {
   await segarkanKonfigurasi();
   const gagal: string[] = [];
 
   // 1) Kunci dari aplikasi (input admin di halaman Ailsa) paling dulu.
   if (cfg.dariDb && cfg.key) {
-    const r = await panggilSatu({ base: cfg.base, key: cfg.key, model: cfg.model, pesan, suhu, jsonMode: true, batasMs: 30000 });
+    const r = await panggilSatu({ base: cfg.base, key: cfg.key, model: cfg.model, pesan, suhu, jsonMode: modeJson, batasMs: 30000, maxTokens });
     if (r.ok) return { ...r, sumber: "aplikasi" };
     gagal.push(`kunci aplikasi: ${r.error}`);
   }
   // 2) bansos-deepseek (kuota khusus bot). Batas 9 detik: kalau lambat, pindah.
   if (FKEY && FBASE) {
-    const pertama = await panggilSatu({ base: FBASE, key: FKEY, model: FMODEL, pesan, suhu, jsonMode: false, batasMs: 9000 });
+    const pertama = await panggilSatu({ base: FBASE, key: FKEY, model: FMODEL, pesan, suhu, jsonMode: false, batasMs: 9000, maxTokens });
     if (pertama.ok) return { ...pertama, sumber: "utama" };
     gagal.push(`bansos: ${pertama.error}`);
   }
   // 3) Kunci env utama.
   if (ENV_KEY) {
-    const cadangan = await panggilSatu({ base: ENV_BASE, key: ENV_KEY, model: ENV_MODEL, pesan, suhu, jsonMode: true, batasMs: 25000 });
+    const cadangan = await panggilSatu({ base: ENV_BASE, key: ENV_KEY, model: ENV_MODEL, pesan, suhu, jsonMode: modeJson, batasMs: 25000, maxTokens });
     if (cadangan.ok) return { ...cadangan, sumber: "cadangan" };
     gagal.push(`kunci env: ${cadangan.error}`);
   }
@@ -181,4 +181,10 @@ export function parseJsonLonggar(teks: string): Record<string, unknown> | null {
   const akhir = bersih.lastIndexOf("}");
   if (awal >= 0 && akhir > awal) return coba(bersih.slice(awal, akhir + 1));
   return null;
+}
+
+// Varian teks polos (bukan JSON) — dipakai penyusun surat dari poin-poin.
+// Sumber kunci dan urutan cadangannya sama persis dengan panggilLLM.
+export async function panggilLLMTeks(pesan: Pesan[], suhu = 0.3): Promise<Jawaban> {
+  return panggilLLM(pesan, suhu, false, 2500);
 }
