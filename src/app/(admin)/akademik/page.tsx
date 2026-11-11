@@ -185,7 +185,17 @@ export default function AkademikPage() {
       {error ? <ErrorState message={error} /> : null}
       {info ? <p className="success" role="status">{info}</p> : null}
 
-      <div className="card">
+      <nav aria-label="Lompat ke bagian Akademik" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+        <a className="btn secondary" href="#siklus">Siklus Belajar ({data.cycles.length})</a>
+        <a className="btn secondary" href="#stppa">Butir STPPA ({data.stppa.length})</a>
+        <a className="btn secondary" href="#impor-stppa">Impor STPPA (CSV)</a>
+        <a className="btn secondary" href="#material">Katalog Material AMI ({(data.materials || []).length})</a>
+        <a className="btn secondary" href="#milestone">Katalog Milestone ({(data.milestones || []).length})</a>
+        <a className="btn secondary" href="#promosi">Promosi Kelas</a>
+        <a className="btn secondary" href="#kegiatan">Kegiatan Sekolah ({(data.events || []).length})</a>
+      </nav>
+
+      <div className="card" id="siklus" style={{ scrollMarginTop: 12 }}>
         <h2 style={{ marginTop: 0 }}>Siklus belajar ({data.cycles.length})</h2>
         <form
           onSubmit={async (e) => {
@@ -239,7 +249,7 @@ export default function AkademikPage() {
         )}
       </div>
 
-      <div className="card" style={{ marginTop: 12 }}>
+      <div className="card" id="stppa" style={{ marginTop: 12, scrollMarginTop: 12 }}>
         <h2 style={{ marginTop: 0 }}>Butir STPPA ({data.stppa.length})</h2>
         <form
           onSubmit={async (e) => {
@@ -315,7 +325,7 @@ export default function AkademikPage() {
         )}
       </div>
 
-      <div className="card" style={{ marginTop: 12 }}>
+      <div className="card" id="impor-stppa" style={{ marginTop: 12, scrollMarginTop: 12 }}>
         <h2 style={{ marginTop: 0 }}>Impor Butir STPPA (CSV)</h2>
         <p className="muted" style={{ marginTop: 0 }}>
           Format: <code>Kelompok Usia; Aspek; Butir</code> — satu butir per baris. Butir yang sudah ada tidak digandakan.
@@ -359,7 +369,7 @@ export default function AkademikPage() {
         ) : null}
       </div>
 
-      <div className="card" style={{ marginTop: 12 }}>
+      <div className="card" id="material" style={{ marginTop: 12, scrollMarginTop: 12 }}>
         <h2 style={{ marginTop: 0 }}>Katalog Material Montessori AMI ({(data.materials || []).length})</h2>
         <p className="muted" style={{ marginTop: 0 }}>
           Material aktif tampil sebagai pilihan di editor laporan harian. Nonaktifkan material yang tidak dipakai lagi — laporan lama yang memakainya tetap utuh.
@@ -431,7 +441,7 @@ export default function AkademikPage() {
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: 12 }}>
+      <div className="card" id="milestone" style={{ marginTop: 12, scrollMarginTop: 12 }}>
         <h2 style={{ marginTop: 0 }}>Katalog Milestone Perkembangan ({(data.milestones || []).length})</h2>
         <p className="muted" style={{ marginTop: 0 }}>
           Milestone baru mulai sebagai <strong>draf</strong>. Tinjau lalu aktifkan supaya tampil penuh di pemilih editor laporan; arsipkan yang tidak dipakai lagi.
@@ -506,7 +516,7 @@ export default function AkademikPage() {
 
       <KartuPromosi classes={data.classes} onDone={load} />
 
-      <div className="card" style={{ marginTop: 12 }}>
+      <div className="card" id="kegiatan" style={{ marginTop: 12, scrollMarginTop: 12 }}>
         <h2 style={{ marginTop: 0 }}>Kegiatan Sekolah ({(data.events || []).length})</h2>
         <p className="muted" style={{ marginTop: 0 }}>
           Kegiatan tampil di Dashboard staf dan di Balita Connect orang tua. Tandai <strong>hari libur</strong> untuk hari tanpa kegiatan belajar.
@@ -634,7 +644,7 @@ function KartuPromosi({ classes, onDone }: { classes: Array<{ id: string; name: 
   }
 
   return (
-    <article className="card">
+    <article className="card" id="promosi" style={{ scrollMarginTop: 12 }}>
       <h2 style={{ marginTop: 0 }}>Promosi / Kenaikan Kelas</h2>
       <p className="muted" style={{ marginTop: 0 }}>
         Pindahkan anak dari kelas asal ke kelas tujuan dalam cabang yang sama. Pendaftaran di kelas lama
