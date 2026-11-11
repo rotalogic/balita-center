@@ -54,6 +54,25 @@ psql "$DATABASE_URL" -f database/migrasi-zkc-tahap4.sql
 psql "$DATABASE_URL" -f database/migrasi-zkc-tahap5.sql
 psql "$DATABASE_URL" -f database/migrasi-zkc-tahap2-kerangka.sql
 psql "$DATABASE_URL" -f database/migrasi-zkc-tahap2-kurikulum.sql
+psql "$DATABASE_URL" -f database/migrasi-zkc-tahap2-material.sql
+psql "$DATABASE_URL" -f database/migrasi-zkc-tahap2-kalender.sql
+psql "$DATABASE_URL" -f database/migrasi-zkc-tahap2-dokumentasi.sql
+psql "$DATABASE_URL" -f database/migrasi-zkc-tahap2-deteksi.sql
+```
+
+Sesudah migrasi, muat berkas impor resmi lembaga (salinannya tersimpan di
+`database/impor/`; STPPA 210 butir dapat juga lewat tombol Impor CSV di
+Akademik): impor-stppa-zkc-sam.csv (210),
+impor-milestone-zkc.csv (210, masuk sebagai draf),
+impor-material-sam.csv (164 = CASA 100 + NIDO 64),
+impor-siklus-tema-zkc.csv (14 bulan, mengisi kurikulum_bulan).
+
+Lalu muat isi katalog hasil transkrip dokumen paket (bahan ajar 106,
+calistung 9 tahap + 64 materi, movement 72, kalender 83, bank deteksi 154)
+dengan satu berkas data — jalankan sekali, aman diulang:
+
+```bash
+psql "$DATABASE_URL" -f database/muat-paket-lengkap.sql
 ```
 
 Semua migrasi memakai `IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`,

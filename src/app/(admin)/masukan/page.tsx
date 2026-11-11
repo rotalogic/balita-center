@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ErrorState, LoadingState, PageHead } from "@/components/chrome";
-import { ASPEK_MASUKAN } from "@/lib/tahap4";
+import { ASPEK_MASUKAN, KUNCI_REKOMENDASI } from "@/lib/tahap4";
 
 type M = Record<string, unknown> & { id: string };
 
@@ -51,7 +51,7 @@ export default function MasukanAdminPage() {
             </span>
           </div>
           <p style={{ margin: "8px 0 0" }}>
-            {ASPEK_MASUKAN.map(([k, l]) => `${l}: ${(m.aspek as Record<string, string>)?.[k] || "—"}`).join(" · ")}
+            {ASPEK_MASUKAN.map(([k, l]) => `${l}: ${(m.aspek as Record<string, string>)?.[k] || "—"}`).join(" · ")}{(m.aspek as Record<string, string>)?.[KUNCI_REKOMENDASI] ? ` · Kemungkinan merekomendasikan: ${(m.aspek as Record<string, string>)[KUNCI_REKOMENDASI]}` : ""}
           </p>
           {m.cerita ? <p className="muted" style={{ marginTop: 4 }}>“{String(m.cerita)}”</p> : null}
           {m.tindak_lanjut ? <p style={{ marginTop: 4 }}><strong>Tindak lanjut:</strong> {String(m.tindak_lanjut)}</p> : null}

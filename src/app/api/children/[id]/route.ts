@@ -55,11 +55,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       full_name: "full_name", nickname: "nickname", birth_date: "birth_date", gender: "gender",
       blood_type: "blood_type", status: "status", health_notes: "health_notes",
       special_needs: "special_needs", languages: "languages", hobbies: "hobbies",
-      transport_mode: "transport_mode", photo_url: "photo_url",
+      transport_mode: "transport_mode", photo_url: "photo_url", tautan_folder_dokumentasi: "tautan_folder_dokumentasi",
       kategori_program: "kategori_program", label_status: "label_status",
     };
     if ("kategori_program" in body && !["ZKC", "SAM"].includes(body.kategori_program)) {
       return NextResponse.json({ ok: false, error: "Kategori program harus ZKC atau SAM." }, { status: 400 });
+    }
+    if ("tautan_folder_dokumentasi" in body && (body.tautan_folder_dokumentasi || "").trim() !== "" && !/^https?:\/\//i.test((body.tautan_folder_dokumentasi || "").trim())) {
+      return NextResponse.json({ ok: false, error: "Tautan folder dokumentasi harus diawali http:// atau https://." }, { status: 400 });
     }
     if ("label_status" in body && !["Anggota", "Trial", "Insidentil", "Peserta Event", "Klien Skrining", "Klien Konsultasi"].includes(body.label_status)) {
       return NextResponse.json({ ok: false, error: "Label status anak tidak dikenal." }, { status: 400 });

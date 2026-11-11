@@ -51,6 +51,7 @@ export async function bangunPdfLaporan(r: BarisLaporan, reportId: string, asal: 
     [reportId]
   );
   const fotoBuffers = await Promise.all(aktivitas.map((a) => muatBerkas(a.photo_url, asal, cookie)));
+  const fotoAnak = await muatBerkas((r.child_photo as string | null) || null, asal, cookie);
   const banner = await readFile(path.join(process.cwd(), "public/ilustrasi/sampul-laporan.jpg")).catch(() => null);
   const identitas = await getIdentitas();
   const logo = await muatBerkas(identitas.logo_url, asal, cookie);
@@ -91,6 +92,8 @@ export async function bangunPdfLaporan(r: BarisLaporan, reportId: string, asal: 
     })),
     segments: segmen,
     photos: fotoBuffers,
+    child_photo: fotoAnak,
+    folder_dokumentasi: (r.child_folder as string | null) || null,
     banner,
     ttd,
     logo,
@@ -107,6 +110,7 @@ export async function bangunPdfRapor(r: BarisRapor, reportId: string, asal: stri
   const fotoBuffers = await Promise.all(
     agregat.foto.map((f) => muatBerkas((f.media_type === "video" ? f.poster_url : f.url) ?? null, asal, cookie))
   );
+  const fotoAnak = await muatBerkas((r.child_photo as string | null) || null, asal, cookie);
   const narratives: Record<string, string | null> = {};
   for (const k of KOLOM_NARASI) narratives[k] = r[k] ? String(r[k]) : null;
 
@@ -130,6 +134,8 @@ export async function bangunPdfRapor(r: BarisRapor, reportId: string, asal: stri
     tanggapan_ortu: r.tanggapan_ortu ? String(r.tanggapan_ortu) : null,
     agregat,
     photos: fotoBuffers,
+    child_photo: fotoAnak,
+    folder_dokumentasi: (r.child_folder as string | null) || null,
     sekolah_kop: kopLengkap(identitas),
     kop_baris: kopTigaBaris(identitas),
     banner,

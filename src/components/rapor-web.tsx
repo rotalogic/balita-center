@@ -151,9 +151,14 @@ export function RaporWeb({
             {` · ${formatTanggal(report.cycle_start as string)} – ${formatTanggal(report.cycle_end as string)}`}
           </div>
         </div>
-        {pdfUrl ? (
-          <div className="rap-kanan"><a className="rap-pil" href={pdfUrl}>⭳ PDF</a></div>
-        ) : null}
+        <div className="rap-kanan" style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={String(report.child_photo || "/aset-lembaga/foto-anak-placeholder.png")} alt={`Foto ${String(report.child_name || "")}`} style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover" }} />
+          {pdfUrl ? <a className="rap-pil" href={pdfUrl}>⭳ PDF</a> : null}
+          {report.child_folder ? (
+            <a className="rap-pil" href={String(report.child_folder)} target="_blank" rel="noreferrer">📁 Folder Dokumentasi</a>
+          ) : null}
+        </div>
       </header>
 
       <div className="rap-sampul"><img src="/ilustrasi/sampul-rapor.jpg" alt="Ilustrasi guru membacakan buku bersama anak di taman sekolah" /></div>

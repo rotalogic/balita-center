@@ -17,7 +17,7 @@ export function labelKategoriBahanAjar(kode: string): string {
 // gabungan lembaga (bahan ajar pelengkap butir Enam + komponen laporan SAM).
 export const SUBKATEGORI_RESAMI: Record<string, string[]> = {
   islamic_living: ["Doa Harian", "Hadis Pilihan", "Pengenalan Juz 30", "Huruf Hijaiyah", "Mengaji Metode Ummi", "Tangga Menulis Hijaiyah"],
-  bahasa_inggris: ["Gugus Kata", "Ungkapan"],
+  bahasa_inggris: ["Gugus Kata", "Ungkapan", "Dialog Situasi"],
   bahasa_arab: ["Tangga Menulis Hijaiyah", "Bahan Dasar"],
   pelengkap: [],
 };

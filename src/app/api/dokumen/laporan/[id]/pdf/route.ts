@@ -16,7 +16,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
             r.nap_start, r.nap_end, r.nap_quality, r.toilet_pee_count, r.toilet_poop_count, r.notes,
             r.circle_theme, r.circle_rating, r.circle_notes, r.special_moment, r.home_suggestion,
             to_char(r.published_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') AS published_at,
-            c.id AS child_id, c.full_name AS child_name, cl.name AS class_name, b.name AS branch_name,
+            c.id AS child_id, c.full_name AS child_name, c.photo_url AS child_photo, c.tautan_folder_dokumentasi AS child_folder, cl.name AS class_name, b.name AS branch_name,
             s.full_name AS teacher, s.signature_url AS teacher_ttd
        FROM daily_reports r
        JOIN children c ON c.id = r.child_id

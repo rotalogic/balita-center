@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorState, PageHead } from "@/components/chrome";
 
-type Entri = { id: string; tanggal: string; judul: string; lapis: string; keterangan: string | null };
+type Entri = { id: string; tanggal: string; tanggal_selesai: string | null; judul: string; lapis: string; keterangan: string | null };
 
 const LAPIS: Record<string, { label: string; warna: string }> = {
   momen: { label: "Momen & Ritme Lembaga", warna: "#8A6844" },
@@ -17,7 +17,7 @@ export default function KalenderPage() {
   const [tahun, setTahun] = useState(kini.getFullYear());
   const [bulan, setBulan] = useState(kini.getMonth());
   const [entri, setEntri] = useState<Entri[]>([]);
-  const [f, setF] = useState({ tanggal: "", judul: "", lapis: "momen", keterangan: "" });
+  const [f, setF] = useState({ tanggal: "", tanggal_selesai: "", judul: "", lapis: "momen", keterangan: "" });
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -63,7 +63,7 @@ export default function KalenderPage() {
     setBusy(false);
     if (!d.ok) { setError(d.error); return; }
     setInfo("Entri kalender ditambahkan.");
-    setF({ tanggal: "", judul: "", lapis: "momen", keterangan: "" });
+    setF({ tanggal: "", tanggal_selesai: "", judul: "", lapis: "momen", keterangan: "" });
     load();
   }
 
@@ -100,8 +100,8 @@ export default function KalenderPage() {
               <div key={key} style={{ minHeight: 74, border: "1px solid var(--line, #e5ddd2)", borderRadius: 8, padding: 4, opacity: bulanIni ? 1 : 0.45, background: key === iso(new Date()) ? "#fdf6ec" : undefined }}>
                 <div style={{ fontSize: 12, fontWeight: 600 }}>{d.getDate()}</div>
                 {daftar.map((e) => (
-                  <div key={e.id} title={e.keterangan || e.judul} style={{ fontSize: 11, background: LAPIS[e.lapis]?.warna, color: "#fff", borderRadius: 4, padding: "1px 4px", marginTop: 2 }}>
-                    {e.judul}
+                  <div key={e.id} title={`${e.keterangan || e.judul}${e.tanggal_selesai && e.tanggal_selesai !== e.tanggal ? ` (berlangsung s.d. ${e.tanggal_selesai})` : ""}`} style={{ fontSize: 11, background: LAPIS[e.lapis]?.warna, color: "#fff", borderRadius: 4, padding: "1px 4px", marginTop: 2 }}>
+                    {e.judul}{e.tanggal_selesai && e.tanggal_selesai !== e.tanggal ? " …" : ""}
                     <button type="button" aria-label={`Hapus ${e.judul}`} disabled={busy} onClick={() => void hapus(e.id)}
                       style={{ float: "right", background: "none", border: "none", color: "#fff", cursor: "pointer", padding: 0 }}>×</button>
                   </div>
@@ -117,6 +117,8 @@ export default function KalenderPage() {
           <div className="grid-form">
             <div className="field"><label htmlFor="kl_tgl">Tanggal *</label>
               <input id="kl_tgl" type="date" required value={f.tanggal} onChange={(e) => setF({ ...f, tanggal: e.target.value })} /></div>
+            <div className="field"><label htmlFor="kl_tgl2">Tanggal selesai (opsional, untuk entri berentang)</label>
+              <input id="kl_tgl2" type="date" value={f.tanggal_selesai} onChange={(e) => setF({ ...f, tanggal_selesai: e.target.value })} /></div>
             <div className="field"><label htmlFor="kl_lapis">Lapis kalender *</label>
               <select id="kl_lapis" value={f.lapis} onChange={(e) => setF({ ...f, lapis: e.target.value })}>
                 {Object.entries(LAPIS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}

@@ -73,7 +73,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   if (denied.error) return denied.error;
   try {
     const report = await query(
-      `SELECT r.*, c.full_name AS child_name, cl.name AS class_name,
+      `SELECT r.*, c.full_name AS child_name, c.photo_url AS child_photo, c.tautan_folder_dokumentasi AS child_folder, cl.name AS class_name,
               s.full_name AS teacher_name, s.photo_url AS teacher_photo, s.signature_url AS teacher_ttd, lf.full_name AS facilitator_name,
               du.full_name AS deleted_by_name
          FROM daily_reports r

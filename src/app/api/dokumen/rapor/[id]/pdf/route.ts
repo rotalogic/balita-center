@@ -12,7 +12,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
   if (!user) return new Response("Silakan login.", { status: 401 });
 
   const rows = await query<Record<string, string | null> & { child_id: string; cycle_start: string; cycle_end: string }>(
-    `SELECT cr.*, c.full_name AS child_name, b.name AS branch_name,
+    `SELECT cr.*, c.full_name AS child_name, c.photo_url AS child_photo, c.tautan_folder_dokumentasi AS child_folder, b.name AS branch_name,
             lc.theme AS cycle_theme, lc.start_date::text AS cycle_start, lc.end_date::text AS cycle_end,
             s.full_name AS teacher_name, s.signature_url AS teacher_ttd,
             (SELECT cl.name FROM enrollments e JOIN classes cl ON cl.id = e.class_id

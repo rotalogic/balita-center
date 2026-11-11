@@ -14,6 +14,7 @@ type Data = {
   teacher: string | null; status: string;
   narratives: Record<string, string | null>;
   inggris_tahap?: number | null;
+  child_photo?: Buffer | null; folder_dokumentasi?: string | null;
   tanggapan_ortu?: string | null;
   agregat: AgregatRapor;
   photos?: Array<Buffer | null>; // sejajar agregat.foto
@@ -129,14 +130,25 @@ export function buatPdfRapor(d: Data): PDFKit.PDFDocument {
     ["Siklus", d.cycle_theme],
     ["Periode", `${tgl(d.cycle_start)} – ${tgl(d.cycle_end)}`],
     ["Cabang", d.branch_name],
+    ...(d.folder_dokumentasi ? [["Folder Dokumentasi", d.folder_dokumentasi] as [string, string]] : []),
   ];
   const hIdent = barisIdent.length * 14 + 16;
   doc.roundedRect(kiri, y, lebar, hIdent, 8).fill(PANEL);
   let yi = y + 8;
   for (const [k, v] of barisIdent) {
-    doc.font("Helvetica").fontSize(9.5).fillColor("#4a545e").text(k, kiri + 14, yi, { width: 70 });
-    doc.font("Helvetica-Bold").fontSize(9.5).fillColor(GELAP).text(v, kiri + 90, yi, { width: lebar - 104 });
+    doc.font("Helvetica").fontSize(9.5).fillColor("#4a545e").text(k, kiri + 14, yi, { width: 110 });
+    if (k === "Folder Dokumentasi") {
+      doc.font("Helvetica").fontSize(8.5).fillColor("#15608a").text(v, kiri + 130, yi, { width: lebar - 144, link: v, underline: true });
+    } else {
+      doc.font("Helvetica-Bold").fontSize(9.5).fillColor(GELAP).text(v, kiri + 130, yi, { width: lebar - 144 });
+    }
     yi += 14;
+  }
+  if (d.child_photo) {
+    doc.save();
+    doc.roundedRect(kiri + lebar - 66, y + 8, 54, 54, 8).clip();
+    try { doc.image(d.child_photo, kiri + lebar - 66, y + 8, { width: 54, height: 54 }); } catch { /* abaikan */ }
+    doc.restore();
   }
   y += hIdent + 20;
 

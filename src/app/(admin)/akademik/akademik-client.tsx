@@ -410,7 +410,7 @@ export function AkademikClient({ bagian }: { bagian?: string }) {
             return (
               <div key={m.id} style={{ borderTop: "1px solid var(--line)", padding: "10px 0" }}>
                 <div className="row spread">
-                  <span><strong>{m.name}</strong> <span className="muted">· {LABEL_AREA[m.area] || m.area}{m.age_group ? ` · usia ${m.age_group}` : ""}</span></span>
+                  <span><strong>{m.name}</strong> <span className="muted">· {LABEL_AREA[m.area] || m.area}{(m as { jenjang?: string }).jenjang ? ` · ${(m as { jenjang?: string }).jenjang}${(m as { usia_presentasi?: string }).usia_presentasi ? ` · presentasi ${(m as { usia_presentasi?: string }).usia_presentasi}` : ""}` : m.age_group ? ` · usia ${m.age_group}` : ""}</span>{(m as { indikator_penguasaan?: string }).indikator_penguasaan ? <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>Indikator penguasaan: {(m as { indikator_penguasaan?: string }).indikator_penguasaan}</div> : null}</span>
                   <span className="row">
                     <StatusBadge status={m.is_active ? "aktif" : "nonaktif"} />
                     <button type="button" className="btn small secondary" disabled={busy === "katalog"}

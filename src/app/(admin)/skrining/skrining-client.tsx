@@ -70,6 +70,7 @@ export function SkriningClient({ bagian }: { bagian?: string }) {
       <nav aria-label="Kamar-kamar Skrining" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
         <a className={bagian === "daftar" ? "btn" : "btn secondary"} href="/skrining/daftar">Klien & Pemeriksaan</a>
         <a className={bagian === "rujukan" ? "btn" : "btn secondary"} href="/skrining/rujukan">Berkas Rujukan</a>
+        <a className="btn secondary" href="/skrining/bank">Bank Deteksi &amp; Rujukan</a>
         <a className="btn secondary" href="/minat-bakat">Minat & Bakat</a>
       </nav>
 

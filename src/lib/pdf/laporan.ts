@@ -15,6 +15,7 @@ type Data = {
   nap_quality: string | null; toilet_pee_count: number | null; toilet_poop_count: number | null;
   notes: string | null; circle_theme: string | null; circle_rating: number | null; circle_notes: string | null;
   special_moment: string | null; home_suggestion: string | null; published_at: string | null;
+  child_photo?: Buffer | null; folder_dokumentasi?: string | null;
   activities: Array<{
     title: string; apparatus: string | null; area: string | null; rating: number | null;
     activity_time: string | null; notes: string | null; work_location: string | null; work_mode: string | null;
@@ -129,12 +130,21 @@ export function buatPdfLaporan(d: Data): PDFKit.PDFDocument {
   doc.save();
   doc.roundedRect(kiri, y, lebar, 62, 14).fill(W.pita);
   doc.roundedRect(kiri + 13, y + 13, 36, 36, 9).fill("#ffffff");
+  if (d.child_photo) {
+    // Foto anak menggantikan ikon kalender pada kotak kepala (Permohonan
+    // Penyesuaian Ketiga: foto anak tampil pada laporan).
+    doc.save();
+    doc.roundedRect(kiri + 13, y + 13, 36, 36, 9).clip();
+    try { doc.image(d.child_photo, kiri + 13, y + 13, { width: 36, height: 36 }); } catch { /* berkas bukan gambar: abaikan */ }
+    doc.restore();
+  } else {
   // Ikon kalender sederhana
   doc.strokeColor(W.teal).lineWidth(1.6);
   doc.roundedRect(kiri + 22, y + 23, 18, 16, 2).stroke();
   doc.moveTo(kiri + 22, y + 28.5).lineTo(kiri + 40, y + 28.5).stroke();
   doc.moveTo(kiri + 26, y + 20).lineTo(kiri + 26, y + 26).stroke();
   doc.moveTo(kiri + 36, y + 20).lineTo(kiri + 36, y + 26).stroke();
+  }
   doc.fillColor(W.teal).font("Helvetica-Bold").fontSize(8.5).text("L A P O R A N  H A R I A N", kiri + 60, y + 10, { width: lebar - 190 });
   doc.fillColor(W.gelap).fontSize(14.5).text(tgl(d.report_date), kiri + 60, y + 22, { width: lebar - 190 });
   doc.fillColor("#5b6b82").font("Helvetica").fontSize(9)
@@ -148,6 +158,11 @@ export function buatPdfLaporan(d: Data): PDFKit.PDFDocument {
   }
   doc.restore();
   y += 62 + 18;
+  if (d.folder_dokumentasi) {
+    doc.fillColor(W.tealGelap).font("Helvetica").fontSize(8.5)
+      .text(`Folder Dokumentasi Anak: ${d.folder_dokumentasi}`, kiri, y - 12, { width: lebar, link: d.folder_dokumentasi, underline: true });
+    y += 6;
+  }
 
   // ---------- Ilustrasi sampul ----------
   if (d.banner) {

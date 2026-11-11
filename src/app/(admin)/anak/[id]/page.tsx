@@ -38,6 +38,39 @@ const ASPECTS: Array<[string, string]> = [
   ["cognitive_pct", "Kognitif"], ["language_pct", "Bahasa"], ["social_emotional_pct", "Sosial & Emosional"], ["independence_pct", "Kemandirian"],
 ];
 
+function EditorFolderDokumentasi({ childId, awal }: { childId: string; awal: string | null }) {
+  const [tautan, setTautan] = useState(awal || "");
+  const [pesan, setPesan] = useState<string | null>(null);
+  const [sibuk, setSibuk] = useState(false);
+  async function simpan() {
+    setSibuk(true); setPesan(null);
+    const res = await fetch(`/api/children/${childId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tautan_folder_dokumentasi: tautan.trim() }),
+    });
+    const d = await res.json();
+    setSibuk(false);
+    setPesan(d.ok ? "Tautan folder dokumentasi tersimpan." : (d.error || "Gagal menyimpan."));
+  }
+  return (
+    <div style={{ marginTop: 10 }}>
+      <dt className="muted">Folder Dokumentasi (Google Drive)</dt>
+      <dd>
+        {awal ? <a href={awal} target="_blank" rel="noreferrer">Buka folder dokumentasi anak</a> : <span className="muted">Belum diisi</span>}
+        <div className="row" style={{ gap: 6, marginTop: 6 }}>
+          <input aria-label="Tautan folder dokumentasi anak" type="url" placeholder="https://drive.google.com/…"
+            value={tautan} onChange={(e) => setTautan(e.target.value)} style={{ flex: "1 1 200px" }} />
+          <button type="button" className="btn small secondary" disabled={sibuk} onClick={() => void simpan()}>Simpan</button>
+        </div>
+        {pesan ? <div className="muted" style={{ marginTop: 4 }}>{pesan}</div> : null}
+        <div className="muted" style={{ marginTop: 4, fontSize: 12.5 }}>
+          Tautan beserta foto anak tampil pada laporan harian dan rapor anak (Permohonan Penyesuaian Ketiga lembaga).
+        </div>
+      </dd>
+    </div>
+  );
+}
+
 export default function DetailAnakPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -206,6 +239,7 @@ export default function DetailAnakPage() {
               <dt className="muted">Transportasi</dt><dd>{String(child.transport_mode || "-")}</dd>
               <dt className="muted">Tanggal masuk</dt><dd>{tanggalPanjang(child.enrolled_on as string)}</dd>
             </dl>
+            <EditorFolderDokumentasi childId={String(child.id)} awal={(child.tautan_folder_dokumentasi as string) || null} />
           </article>
           <KartuKesepakatan childId={String(child.id)} />
           <KartuRujukan childId={String(child.id)} childName={String(child.full_name || "")} />

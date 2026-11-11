@@ -204,6 +204,8 @@ export function LaporanWeb({
   activities,
   segments,
   childName,
+  childPhoto,
+  folderUrl,
   reporterName,
   reporterPhoto,
   reporterTtd,
@@ -213,6 +215,8 @@ export function LaporanWeb({
   activities: LaporanAktivitas[];
   segments?: Array<{ segmen: string; catatan: string }>;
   childName: string;
+  childPhoto?: string | null;
+  folderUrl?: string | null;
   reporterName?: string | null;
   reporterPhoto?: string | null;
   reporterTtd?: string | null;
@@ -236,12 +240,18 @@ export function LaporanWeb({
       <GayaLaporan />
       <header className="lap-kepala">
         <span className="lap-kal"><Ikon d={JALUR.kalender} size={22} warna="#1d7fa8" /></span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={childPhoto || "/aset-lembaga/foto-anak-placeholder.png"} alt={`Foto ${childName}`}
+          style={{ width: 46, height: 46, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
         <div>
           <div className="kecil">LAPORAN HARIAN</div>
           <div className="tanggal">{tanggalKepala(report.report_date)}</div>
           <div className="anak">{childName}</div>
         </div>
         <div className="lap-kanan">
+          {folderUrl ? (
+            <a className="lap-pil" href={folderUrl} target="_blank" rel="noreferrer">📁 Folder Dokumentasi</a>
+          ) : null}
           {pdfUrl ? (
             <a className="lap-pil" href={pdfUrl}><Ikon d={JALUR.unduh} size={15} warna="#15608a" /> PDF</a>
           ) : null}

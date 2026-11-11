@@ -172,6 +172,8 @@ export default function DailyReportDetailPage({ params }: { params: { id: string
           activities={activities}
           segments={segments}
           childName={report.child_name}
+          childPhoto={(report as Record<string, unknown>).child_photo as string || null}
+          folderUrl={(report as Record<string, unknown>).child_folder as string || null}
           reporterName={report.teacher_name}
           reporterPhoto={report.teacher_photo}
           reporterTtd={report.teacher_ttd}

@@ -11,14 +11,51 @@ export const POIN_DARI_KATA: Record<string, number> = {
   "Sangat Baik": 4, "Baik": 3, "Cukup": 2, "Perlu Perbaikan": 1,
 };
 
-// Empat aspek Masukan Orang Tua (nama aspek mengikuti dokumen lembaga;
-// konstanta tunggal ini tempat penyesuaiannya).
-export const ASPEK_MASUKAN: Array<[string, string]> = [
-  ["pelayanan_guru", "Pelayanan Guru kepada Anak"],
-  ["komunikasi", "Komunikasi dengan Orang Tua"],
-  ["lingkungan_kegiatan", "Lingkungan & Kegiatan Belajar"],
-  ["administrasi", "Administrasi & Layanan Umum"],
+// Formulir Masukan Orang Tua resmi lembaga (Formulir_Masukan_Orang_Tua_
+// ZKC_SAM): lima bidang, masing-masing tiga pernyataan, dinilai dengan
+// SKALA_MASUKAN; empat isian cerita; satu penilaian rekomendasi penutup.
+export const BIDANG_MASUKAN: Array<{ bidang: string; pernyataan: Array<[string, string]> }> = [
+  { bidang: "Guru & Pendamping", pernyataan: [
+    ["guru_memahami", "Guru memahami karakter dan kebutuhan anak kami"],
+    ["guru_komunikasi", "Guru berkomunikasi dengan ramah, jelas, dan menghormati keluarga kami"],
+    ["guru_aman", "Kami merasa anak kami aman dan diterima apa adanya oleh gurunya"],
+  ] },
+  { bidang: "Program & Pembelajaran", pernyataan: [
+    ["program_bermakna", "Kegiatan anak bermakna dan sesuai tahap perkembangannya"],
+    ["program_kemajuan", "Perkembangan anak kami terlihat dan terasa kemajuannya"],
+    ["program_variasi", "Tema dan kegiatan anak bervariasi dan tidak membosankan"],
+  ] },
+  { bidang: "Fasilitas & Lingkungan", pernyataan: [
+    ["fasilitas_lingkungan", "Lingkungan belajar bersih, aman, dan nyaman untuk anak"],
+    ["fasilitas_material", "Material dan alat bermain anak terawat dan memadai"],
+    ["fasilitas_tunggu", "Area tunggu dan fasilitas untuk orang tua memadai"],
+  ] },
+  { bidang: "Administrasi & Komunikasi", pernyataan: [
+    ["admin_respons", "Admin cepat dan jelas menanggapi pertanyaan kami"],
+    ["admin_informasi", "Informasi jadwal, biaya, dan perubahan disampaikan dengan jelas dan tepat waktu"],
+    ["admin_pendaftaran", "Proses pendaftaran dan pemilihan jadwal mudah bagi kami"],
+  ] },
+  { bidang: "Laporan & Dokumentasi", pernyataan: [
+    ["laporan_mudah", "Laporan perkembangan anak mudah dipahami dan terasa menggambarkan anak kami"],
+    ["laporan_dokumentasi", "Foto dan dokumentasi kegiatan anak yang kami terima memadai"],
+    ["laporan_portal", "Portal dan sistem informasi mudah kami gunakan"],
+  ] },
 ];
+
+// Daftar rata seluruh pernyataan (dipakai validasi server & ringkasan admin).
+export const ASPEK_MASUKAN: Array<[string, string]> = BIDANG_MASUKAN.flatMap((b) => b.pernyataan);
+
+// Empat isian cerita Bagian 3 formulir resmi.
+export const CERITA_MASUKAN: Array<[string, string]> = [
+  ["syukuri", "Hal yang paling kami syukuri dari pengalaman anak kami di sini"],
+  ["perbaiki", "Hal yang menurut kami paling perlu diperbaiki (untuk guru, program, fasilitas, atau layanan)"],
+  ["momen", "Kejadian atau momen tertentu yang ingin kami sampaikan"],
+  ["harapan", "Harapan kami untuk periode berikutnya"],
+];
+
+// Penilaian penutup formulir: kemungkinan merekomendasikan lembaga.
+export const SKALA_REKOMENDASI = ["Sangat Besar", "Besar", "Cukup", "Kecil"] as const;
+export const KUNCI_REKOMENDASI = "rekomendasi";
 
 // Empat aspek Penilaian Guru oleh Wali Murid.
 export const ASPEK_PENILAIAN_GURU: Array<[string, string]> = [
@@ -44,9 +81,11 @@ export function bulanRomawi(bulan1sampai12: number): string {
   return ROMAWI[Math.max(1, Math.min(12, bulan1sampai12)) - 1] || "I";
 }
 
-// Format nomor surat: nomor urut, kode jenis, bulan Romawi, tahun.
+// Format nomor surat resmi lembaga (Paket Surat & Proposal ZKC SAM):
+// nomor urut, kode jenis, segmen ZKC-SAM, bulan Romawi, tahun —
+// contoh 014/KSM/ZKC-SAM/XI/2026.
 export function formatNomorSurat(urut: number, kode: string, tanggal: Date): string {
-  return `${String(urut).padStart(3, "0")}/${kode}/${bulanRomawi(tanggal.getMonth() + 1)}/${tanggal.getFullYear()}`;
+  return `${String(urut).padStart(3, "0")}/${kode}/ZKC-SAM/${bulanRomawi(tanggal.getMonth() + 1)}/${tanggal.getFullYear()}`;
 }
 
 // Tahap probation dari tanggal mulai: bulan 1 Adaptasi & Pelatihan, bulan 2

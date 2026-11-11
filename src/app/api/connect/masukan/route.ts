@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { dbErrorMessage, query } from "@/lib/db";
 import { guard } from "@/lib/current-user";
-import { ASPEK_MASUKAN, SKALA_MASUKAN } from "@/lib/tahap4";
+import { ASPEK_MASUKAN, KUNCI_REKOMENDASI, SKALA_MASUKAN, SKALA_REKOMENDASI } from "@/lib/tahap4";
 
 export const dynamic = "force-dynamic";
 
@@ -56,10 +56,13 @@ export async function POST(request: Request) {
     for (const kunci of KUNCI_ASPEK) {
       if (!KATA_SAH.has(String(aspek[kunci] || ""))) {
         return NextResponse.json(
-          { ok: false, error: "Setiap aspek wajib dinilai dengan kata: Sangat Baik, Baik, Cukup, atau Perlu Perbaikan." },
+          { ok: false, error: "Setiap pernyataan wajib dinilai dengan kata: Sangat Baik, Baik, Cukup, atau Perlu Perbaikan." },
           { status: 400 }
         );
       }
+    }
+    if (aspek[KUNCI_REKOMENDASI] && !(SKALA_REKOMENDASI as unknown as string[]).includes(aspek[KUNCI_REKOMENDASI])) {
+      return NextResponse.json({ ok: false, error: "Penilaian rekomendasi tidak dikenal." }, { status: 400 });
     }
     const periode = periodeKini();
     await query(

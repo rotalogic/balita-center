@@ -32,6 +32,8 @@ export default function ConnectLaporanPage() {
         catatan: String(s.catatan ?? ""),
       }))}
       childName={String(data.child.full_name)}
+      childPhoto={(data.child.photo_url as string) || null}
+      folderUrl={(data.child.tautan_folder_dokumentasi as string) || null}
       reporterName={reporter}
       reporterPhoto={(r.teacher_photo as string) || null}
       reporterTtd={(r.teacher_ttd as string) || null}
