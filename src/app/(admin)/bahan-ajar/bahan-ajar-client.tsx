@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { EmptyState, ErrorState, LoadingState, PageHead } from "@/components/chrome";
 import { kirimJson } from "@/lib/http";
-import { KATEGORI_BAHAN_AJAR, labelKategoriBahanAjar } from "@/lib/bahan-ajar";
+import { KATEGORI_BAHAN_AJAR, SUBKATEGORI_RESAMI, TARGET_SUBKATEGORI, labelKategoriBahanAjar } from "@/lib/bahan-ajar";
 
 // Kamar Bahan Ajar & Program Khusus (kerangka Tahap 2). Struktur dan
 // formulirnya lengkap; isi resminya dimuat dari Paket Sistem Terpadu
@@ -13,6 +13,14 @@ type Bahan = { id: string; kategori: string; subkategori: string | null; judul: 
 type Sesi = { id: string; judul: string; fokus: string | null; kelompok_usia: string | null; durasi_menit: number | null; langkah: string | null; urutan: number; aktif: boolean };
 type Tahap = { id: string; nama: string; keterangan: string | null; urutan: number; aktif: boolean };
 type Materi = { id: string; tahap_id: string; nama: string; keterangan: string | null; urutan: number; aktif: boolean };
+type BulanKurikulum = { id: string; bulan: string; tema: string | null; fondasi: string | null; materi_inti: string | null; menu_sensory: string | null; menu_movement: string | null; subtema: string | null };
+type MateriMovement = { id: string; judul: string; keterangan: string | null; urutan: number; aktif: boolean };
+
+const NAMA_BULAN_ID = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+function labelBulan(kode: string): string {
+  const [y, m] = kode.split("-");
+  return `${NAMA_BULAN_ID[Number(m) - 1]} ${y}`;
+}
 
 const formBahanKosong = { kategori: "islamic_living", subkategori: "", judul: "", isi: "", teks_latin: "", urutan: "0" };
 const formSesiKosong = { judul: "", fokus: "", kelompok_usia: "", durasi_menit: "", langkah: "", urutan: "0" };
@@ -35,18 +43,26 @@ export function BahanAjarClient({ bagian }: { bagian?: string }) {
   const [editTahap, setEditTahap] = useState("");
   const [formMateri, setFormMateri] = useState({ tahap_id: "", nama: "", keterangan: "", urutan: "0" });
   const [editMateri, setEditMateri] = useState("");
+  const [kurikulum, setKurikulum] = useState<BulanKurikulum[] | null>(null);
+  const [movement, setMovement] = useState<MateriMovement[] | null>(null);
+  const [editBulan, setEditBulan] = useState("");
+  const [formBulan, setFormBulan] = useState({ tema: "", fondasi: "", materi_inti: "", menu_sensory: "", menu_movement: "", subtema: "" });
+  const [formMovement, setFormMovement] = useState({ judul: "", keterangan: "", urutan: "0" });
+  const [editMovement, setEditMovement] = useState("");
 
   const load = useCallback(async () => {
     try {
-      const [b, s, c] = await Promise.all([
+      const [b, s, c, k] = await Promise.all([
         fetch("/api/bahan-ajar").then((r) => r.json()),
         fetch("/api/bank-sesi").then((r) => r.json()),
         fetch("/api/calistung").then((r) => r.json()),
+        fetch("/api/kurikulum").then((r) => r.json()),
       ]);
       if (b.ok) setBahan(b.bahan as Bahan[]);
       if (s.ok) setSesi(s.sesi as Sesi[]);
       if (c.ok) { setTahap(c.tahap as Tahap[]); setMateri(c.materi as Materi[]); }
-      if (!b.ok || !s.ok || !c.ok) setError(b.error || s.error || c.error || "Gagal memuat data.");
+      if (k.ok) { setKurikulum(k.bulan as BulanKurikulum[]); setMovement(k.movement as MateriMovement[]); }
+      if (!b.ok || !s.ok || !c.ok || !k.ok) setError(b.error || s.error || c.error || k.error || "Gagal memuat data.");
     } catch {
       setError("Koneksi terputus saat memuat data.");
     }
@@ -54,7 +70,7 @@ export function BahanAjarClient({ bagian }: { bagian?: string }) {
 
   useEffect(() => { void load(); }, [load]);
 
-  async function kirim(url: string, method: "POST" | "PUT" | "DELETE", body: unknown, sukses: string) {
+  async function kirim(url: string, method: "POST" | "PUT" | "PATCH" | "DELETE", body: unknown, sukses: string) {
     setBusy(true); setInfo(""); setError("");
     const r = await kirimJson(url, method, body);
     setBusy(false);
@@ -93,6 +109,18 @@ export function BahanAjarClient({ bagian }: { bagian?: string }) {
     } else if (await kirim("/api/calistung", "POST", payload, "Materi calistung ditambahkan.")) setFormMateri({ tahap_id: "", nama: "", keterangan: "", urutan: "0" });
   }
 
+  async function simpanBulan() {
+    if (await kirim("/api/kurikulum", "PUT", { bulan: editBulan, ...formBulan }, `Kurikulum ${labelBulan(editBulan)} tersimpan.`)) setEditBulan("");
+  }
+
+  async function simpanMovement() {
+    const payload = { judul: formMovement.judul, keterangan: formMovement.keterangan, urutan: Number(formMovement.urutan) || 0 };
+    if (editMovement) {
+      const lama = movement?.find((m) => m.id === editMovement);
+      if (await kirim("/api/kurikulum", "PATCH", { id: editMovement, aktif: lama?.aktif !== false, ...payload }, "Materi Movement diperbarui.")) { setEditMovement(""); setFormMovement({ judul: "", keterangan: "", urutan: "0" }); }
+    } else if (await kirim("/api/kurikulum", "POST", payload, "Materi Movement ditambahkan.")) setFormMovement({ judul: "", keterangan: "", urutan: "0" });
+  }
+
   const bahanTampil = (bahan || []).filter((b) => !saringKategori || b.kategori === saringKategori);
 
   return (
@@ -104,6 +132,7 @@ export function BahanAjarClient({ bagian }: { bagian?: string }) {
         <a className={bagian === "pelengkap" ? "btn" : "btn secondary"} href="/bahan-ajar/pelengkap">Bahan Ajar Pelengkap ({bahan?.length ?? 0})</a>
         <a className={bagian === "bank-sesi" ? "btn" : "btn secondary"} href="/bahan-ajar/bank-sesi">Bank Sesi Pendampingan ({sesi?.length ?? 0})</a>
         <a className={bagian === "calistung" ? "btn" : "btn secondary"} href="/bahan-ajar/calistung">Program Khusus Calistung ({tahap?.length ?? 0} tahap)</a>
+        <a className={bagian === "kurikulum" ? "btn" : "btn secondary"} href="/bahan-ajar/kurikulum">Kurikulum ZKC 14 Bulan</a>
       </nav>
 
       {(!bagian || bagian === "pelengkap") && (<>
@@ -118,8 +147,11 @@ export function BahanAjarClient({ bagian }: { bagian?: string }) {
             <select id="ba_kat" value={formBahan.kategori} onChange={(e) => setFormBahan({ ...formBahan, kategori: e.target.value })}>
               {KATEGORI_BAHAN_AJAR.map((k) => (<option key={k.kode} value={k.kode}>{k.label}</option>))}
             </select></div>
-          <div className="field"><label htmlFor="ba_sub">Subkategori</label>
-            <input id="ba_sub" placeholder="mis. Doa Harian / Hadis / Surah / Hijaiyah" value={formBahan.subkategori} onChange={(e) => setFormBahan({ ...formBahan, subkategori: e.target.value })} /></div>
+          <div className="field"><label htmlFor="ba_sub">Subkategori (resmi dari prompt lembaga)</label>
+            <input id="ba_sub" list="ba_sub_list" placeholder="Pilih atau tulis subkategori" value={formBahan.subkategori} onChange={(e) => setFormBahan({ ...formBahan, subkategori: e.target.value })} />
+            <datalist id="ba_sub_list">
+              {(SUBKATEGORI_RESAMI[formBahan.kategori] || []).map((s) => (<option key={s} value={s} />))}
+            </datalist></div>
           <div className="field"><label htmlFor="ba_judul">Judul *</label>
             <input id="ba_judul" value={formBahan.judul} onChange={(e) => setFormBahan({ ...formBahan, judul: e.target.value })} /></div>
           <div className="field"><label htmlFor="ba_urut">Urutan</label>
@@ -139,6 +171,13 @@ export function BahanAjarClient({ bagian }: { bagian?: string }) {
             <option value="">Semua kategori</option>
             {KATEGORI_BAHAN_AJAR.map((k) => (<option key={k.kode} value={k.kode}>{k.label}</option>))}
           </select>
+        </div>
+        <div className="row" style={{ marginTop: 12, gap: 6, flexWrap: "wrap" }}>
+          <span className="muted">Kelengkapan paket Islamic Living (target prompt):</span>
+          {Object.entries(TARGET_SUBKATEGORI).map(([sub, target]) => {
+            const ada = (bahan || []).filter((b) => b.subkategori === sub).length;
+            return (<span key={sub} className={ada >= target ? "badge ok" : "badge"}>{sub}: {ada}/{target}</span>);
+          })}
         </div>
         {!bahan ? <LoadingState /> : bahanTampil.length === 0 ? (
           <EmptyState title="Belum ada bahan pada kategori ini" body="Bahan resmi dimuat dari Paket Sistem Terpadu lembaga. Petunjuk kategori: Islamic Living (doa, hadis, surah, hijaiyah, bacaan Ummi), Bahasa Inggris ZKC, Bahasa Arab SAM." />
@@ -306,6 +345,107 @@ export function BahanAjarClient({ bagian }: { bagian?: string }) {
                   </button>
                   <button type="button" className="btn small danger" disabled={busy}
                     onClick={() => { if (window.confirm(`Hapus materi "${m.nama}"?`)) void kirim(`/api/calistung?kind=materi&id=${m.id}`, "DELETE", undefined, "Materi dihapus."); }}>
+                    Hapus
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      </>)}
+
+      {(!bagian || bagian === "kurikulum") && (<>
+      <div className="card">
+        <h2 style={{ marginTop: 0 }}>Kurikulum ZKC — November 2026 s.d. Desember 2027</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Empat belas bulan sesuai prompt lembaga. Setiap bulan memuat tema bulanan, fondasi yang dilatih, materi
+          inti, menu sensory play, menu movement, dan subtema mingguan. Tema dan isi resmi dimuat apa adanya dari
+          Paket Sistem Terpadu — baris bulan yang masih kosong berarti isinya belum dimuat, bukan dihapus.
+        </p>
+        {!kurikulum ? <LoadingState /> : (
+          <div>
+            {kurikulum.map((b) => {
+              const terisi = [b.tema, b.fondasi, b.materi_inti, b.menu_sensory, b.menu_movement, b.subtema].filter(Boolean).length;
+              return (
+                <div key={b.id} style={{ padding: "10px 0", borderTop: "1px solid var(--line)" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                    <div>
+                      <strong>{labelBulan(b.bulan)}</strong>{" "}
+                      {b.tema ? <span>· Tema: {b.tema}</span> : <span className="muted">· tema resmi belum dimuat dari paket</span>}
+                      <div className="muted" style={{ fontSize: 13 }}>
+                        Komponen terisi {terisi}/6 — Fondasi {b.fondasi ? "✓" : "—"} · Materi inti {b.materi_inti ? "✓" : "—"} · Sensory {b.menu_sensory ? "✓" : "—"} · Movement {b.menu_movement ? "✓" : "—"} · Subtema {b.subtema ? "✓" : "—"}
+                      </div>
+                    </div>
+                    <button type="button" className="btn small secondary" onClick={() => {
+                      if (editBulan === b.bulan) { setEditBulan(""); return; }
+                      setEditBulan(b.bulan);
+                      setFormBulan({ tema: b.tema || "", fondasi: b.fondasi || "", materi_inti: b.materi_inti || "", menu_sensory: b.menu_sensory || "", menu_movement: b.menu_movement || "", subtema: b.subtema || "" });
+                    }}>{editBulan === b.bulan ? "Tutup" : "Isi / Ubah"}</button>
+                  </div>
+                  {editBulan === b.bulan ? (
+                    <div style={{ marginTop: 10 }}>
+                      <div className="form-grid">
+                        <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="kb_tema">Tema bulanan</label>
+                          <input id="kb_tema" value={formBulan.tema} onChange={(e) => setFormBulan({ ...formBulan, tema: e.target.value })} /></div>
+                        <div className="field"><label htmlFor="kb_fondasi">Fondasi yang dilatih</label>
+                          <textarea id="kb_fondasi" rows={3} value={formBulan.fondasi} onChange={(e) => setFormBulan({ ...formBulan, fondasi: e.target.value })} /></div>
+                        <div className="field"><label htmlFor="kb_materi">Materi inti</label>
+                          <textarea id="kb_materi" rows={3} value={formBulan.materi_inti} onChange={(e) => setFormBulan({ ...formBulan, materi_inti: e.target.value })} /></div>
+                        <div className="field"><label htmlFor="kb_sensory">Menu sensory play</label>
+                          <textarea id="kb_sensory" rows={3} value={formBulan.menu_sensory} onChange={(e) => setFormBulan({ ...formBulan, menu_sensory: e.target.value })} /></div>
+                        <div className="field"><label htmlFor="kb_movement">Menu movement</label>
+                          <textarea id="kb_movement" rows={3} value={formBulan.menu_movement} onChange={(e) => setFormBulan({ ...formBulan, menu_movement: e.target.value })} /></div>
+                        <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="kb_subtema">Subtema mingguan</label>
+                          <textarea id="kb_subtema" rows={3} value={formBulan.subtema} onChange={(e) => setFormBulan({ ...formBulan, subtema: e.target.value })} /></div>
+                      </div>
+                      <div className="row" style={{ marginTop: 10 }}>
+                        <button type="button" className="btn" disabled={busy} onClick={() => void simpanBulan()}>Simpan {labelBulan(b.bulan)}</button>
+                        <button type="button" className="btn secondary" onClick={() => setEditBulan("")}>Batal</button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <h2 style={{ marginTop: 0 }}>Kurikulum Kelas Movement — Peta Materi</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Peta materi Kelas Movement lembaga (kelasnya berjalan 90 menit, kuota 6, sesudah pukul 13.00 — jadwal di
+          Admission). Materi resmi dimuat dari Paket Sistem Terpadu.
+        </p>
+        <div className="form-grid">
+          <div className="field"><label htmlFor="mv_judul">Judul materi *</label>
+            <input id="mv_judul" value={formMovement.judul} onChange={(e) => setFormMovement({ ...formMovement, judul: e.target.value })} /></div>
+          <div className="field"><label htmlFor="mv_urut">Urutan</label>
+            <input id="mv_urut" type="number" value={formMovement.urutan} onChange={(e) => setFormMovement({ ...formMovement, urutan: e.target.value })} /></div>
+          <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="mv_ket">Keterangan</label>
+            <textarea id="mv_ket" rows={2} value={formMovement.keterangan} onChange={(e) => setFormMovement({ ...formMovement, keterangan: e.target.value })} /></div>
+        </div>
+        <div className="row" style={{ marginTop: 10 }}>
+          <button type="button" className="btn" disabled={busy} onClick={() => void simpanMovement()}>{editMovement ? "Simpan Perubahan" : "+ Tambah Materi"}</button>
+          {editMovement ? <button type="button" className="btn secondary" onClick={() => { setEditMovement(""); setFormMovement({ judul: "", keterangan: "", urutan: "0" }); }}>Batal ubah</button> : null}
+        </div>
+        {!movement ? <LoadingState /> : movement.length === 0 ? (
+          <EmptyState title="Peta materi Movement masih kosong" body="Materi resmi kurikulum Kelas Movement dimuat dari Paket Sistem Terpadu lembaga." />
+        ) : (
+          <div style={{ marginTop: 10 }}>
+            {movement.map((m) => (
+              <div key={m.id} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "8px 0", borderTop: "1px solid var(--line)" }}>
+                <div><strong>{m.judul}</strong>{m.keterangan ? <div className="muted">{m.keterangan}</div> : null}</div>
+                <div className="row" style={{ flexShrink: 0 }}>
+                  <span className={m.aktif ? "badge ok" : "badge"}>{m.aktif ? "Aktif" : "Nonaktif"}</span>
+                  <button type="button" className="btn small secondary" onClick={() => { setEditMovement(m.id); setFormMovement({ judul: m.judul, keterangan: m.keterangan || "", urutan: String(m.urutan) }); }}>Ubah</button>
+                  <button type="button" className="btn small secondary" disabled={busy}
+                    onClick={() => void kirim("/api/kurikulum", "PATCH", { id: m.id, judul: m.judul, keterangan: m.keterangan, urutan: m.urutan, aktif: !m.aktif }, m.aktif ? "Materi dinonaktifkan." : "Materi diaktifkan.")}>
+                    {m.aktif ? "Nonaktifkan" : "Aktifkan"}
+                  </button>
+                  <button type="button" className="btn small danger" disabled={busy}
+                    onClick={() => { if (window.confirm(`Hapus materi Movement "${m.judul}"?`)) void kirim(`/api/kurikulum?id=${m.id}`, "DELETE", undefined, "Materi Movement dihapus."); }}>
                     Hapus
                   </button>
                 </div>

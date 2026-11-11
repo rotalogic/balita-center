@@ -13,6 +13,7 @@ const KAMAR: Array<{ href: string; judul: string; keterangan: string; kunci: "cy
   { href: "/akademik/milestone", judul: "Katalog Milestone Perkembangan", keterangan: "Indikator perkembangan: draf, aktif, dan arsip.", kunci: "milestones" },
   { href: "/akademik/promosi", judul: "Promosi / Kenaikan Kelas", keterangan: "Pindahkan anak ke kelas tujuan dalam cabang yang sama.", kunci: null },
   { href: "/akademik/kegiatan", judul: "Kegiatan Sekolah", keterangan: "Kegiatan dan hari libur yang tampil di Dashboard dan Balita Connect.", kunci: "events" },
+  { href: "/bahan-ajar/kurikulum", judul: "Kurikulum ZKC 14 Bulan", keterangan: "Siklus tema kurikulum ZKC Nov 2026–Des 2027 tinggal di menu Bahan Ajar — tautan langsung ke kamarnya.", kunci: null },
 ];
 
 export default function AkademikHubPage() {
