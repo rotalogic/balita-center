@@ -52,6 +52,7 @@ psql "$DATABASE_URL" -f database/migrasi-zkc-tahap3-skrining.sql
 psql "$DATABASE_URL" -f database/migrasi-zkc-tahap3-minat.sql
 psql "$DATABASE_URL" -f database/migrasi-zkc-tahap4.sql
 psql "$DATABASE_URL" -f database/migrasi-zkc-tahap5.sql
+psql "$DATABASE_URL" -f database/migrasi-zkc-tahap2-kerangka.sql
 ```
 
 Semua migrasi memakai `IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`,

@@ -32,6 +32,7 @@ export function useMe(): Me | null {
 const ADMIN_MENU: Array<[string, string, string, string]> = [
   ["/", "Dashboard", "⌂", "dashboard.view"],
   ["/akademik", "Akademik", "▤", "students.view"],
+  ["/bahan-ajar", "Bahan Ajar", "✐", "students.view"],
   ["/anak", "Anak Didik", "☺", "students.view"],
   ["/daily-reports", "Daily Reports", "✓", "dashboard.view"],
   ["/anekdotal", "Anekdotal SAM", "✎", "dashboard.view"],
