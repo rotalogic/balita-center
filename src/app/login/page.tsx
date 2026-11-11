@@ -102,7 +102,7 @@ export default function LoginPage() {
                 required
                 autoFocus
                 autoComplete="username"
-                placeholder="nama@balitacenter.sch.id"
+                placeholder="nama@sekolah.sch.id"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />

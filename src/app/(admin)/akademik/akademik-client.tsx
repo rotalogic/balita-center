@@ -84,6 +84,14 @@ const CONTOH_CSV = `Kelompok Usia;Aspek;Butir
 3-4 tahun;Sosial Emosional;Mau berbagi mainan dengan teman
 3-4 tahun;Kemandirian;Memakai sepatu sendiri`;
 
+const CONTOH_CSV_MILESTONE = `Kelompok Usia;Aspek;Butir
+3-4 tahun;Motorik Kasar;Anak melompat dengan dua kaki di tempat
+3-4 tahun;Bahasa;Anak menyebutkan nama anggota keluarga`;
+
+const CONTOH_CSV_MATERIAL = `Jenjang;Area;Material;Indikator Standar Penguasaan;Usia Presentasi Lazim
+CASA;Practical Life;Membawa kursi & nampan;Membawa dengan dua tangan secara perlahan & aman;2,5-3 th
+NIDO;EPL & Kemandirian;Membawa baki dua tangan;Baki tetap seimbang, isi tidak tumpah;1,5-2 th`;
+
 export function AkademikClient({ bagian }: { bagian?: string }) {
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +100,8 @@ export function AkademikClient({ bagian }: { bagian?: string }) {
   const [cycle, setCycle] = useState({ branch_id: "", class_id: "", theme: "", start_date: "", end_date: "" });
   const [stppa, setStppa] = useState({ age_group: "", aspect: "", item_text: "", sort_order: "0" });
   const [csv, setCsv] = useState("");
+  const [csvMilestone, setCsvMilestone] = useState("");
+  const [csvMaterial, setCsvMaterial] = useState("");
   const [laporanCsv, setLaporanCsv] = useState<Array<{ baris: number; alasan: string; isi: string }>>([]);
   const [edit, setEdit] = useState<{ id: string; item_text: string; sort_order: string } | null>(null);
 
@@ -160,12 +170,12 @@ export function AkademikClient({ bagian }: { bagian?: string }) {
     return true;
   }
 
-  async function imporCsv() {
+  async function imporCsv(kind: string = "stppa_import", teks: string = csv) {
     setBusy("csv");
     setError(null);
     setInfo(null);
     setLaporanCsv([]);
-    const { ok, data: d } = await kirimJson("/api/academic", "POST", { kind: "stppa_import", csv });
+    const { ok, data: d } = await kirimJson("/api/academic", "POST", { kind, csv: teks });
     setBusy(null);
     if (!ok) return setError(String(d.error || "Impor gagal."));
     setLaporanCsv((d.gagal as Array<{ baris: number; alasan: string; isi: string }>) || []);
@@ -342,7 +352,7 @@ export function AkademikClient({ bagian }: { bagian?: string }) {
           onChange={(e) => setCsv(e.target.value)}
         />
         <div className="row" style={{ marginTop: 8 }}>
-          <button type="button" className="btn small" disabled={busy === "csv" || !csv.trim()} onClick={imporCsv}>
+          <button type="button" className="btn small" disabled={busy === "csv" || !csv.trim()} onClick={() => void imporCsv()}>
             {busy === "csv" ? "Mengimpor…" : "Impor CSV"}
           </button>
           <button
@@ -449,6 +459,34 @@ export function AkademikClient({ bagian }: { bagian?: string }) {
 
       </>)}
 
+      {(!bagian || bagian === "material") && (
+      <div className="card" style={{ marginTop: 12 }}>
+        <h2 style={{ marginTop: 0 }}>Impor Material SAM (CSV)</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Format resmi: <code>Jenjang; Area; Material; Indikator Standar Penguasaan; Usia Presentasi Lazim</code> — satu material per baris.
+          Duplikat dibaca per nama + jenjang (CASA/NIDO) dan tidak digandakan.
+        </p>
+        <textarea
+          aria-label="Isi CSV material SAM"
+          rows={7}
+          style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }}
+          placeholder={CONTOH_CSV_MATERIAL}
+          value={csvMaterial}
+          onChange={(e) => setCsvMaterial(e.target.value)}
+        />
+        <div className="row" style={{ marginTop: 8 }}>
+          <button type="button" className="btn small" disabled={busy === "csv" || !csvMaterial.trim()} onClick={() => void imporCsv("material_import", csvMaterial)}>
+            {busy === "csv" ? "Mengimpor…" : "Impor CSV"}
+          </button>
+        </div>
+        {laporanCsv.length > 0 ? (
+          <ul className="muted" style={{ marginTop: 8 }}>
+            {laporanCsv.map((g, i) => (<li key={i}>Baris {g.baris}: {g.alasan}</li>))}
+          </ul>
+        ) : null}
+      </div>
+      )}
+
       {(!bagian || bagian === "milestone") && (<>
       <div className="card" id="milestone" style={{ marginTop: 12, scrollMarginTop: 12 }}>
         <h2 style={{ marginTop: 0 }}>Katalog Milestone Perkembangan ({(data.milestones || []).length})</h2>
@@ -524,6 +562,34 @@ export function AkademikClient({ bagian }: { bagian?: string }) {
       </div>
 
       </>)}
+
+      {(!bagian || bagian === "milestone") && (
+      <div className="card" style={{ marginTop: 12 }}>
+        <h2 style={{ marginTop: 0 }}>Impor Milestone (CSV)</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Format: <code>Kelompok Usia; Aspek; Butir</code> — satu butir per baris. Butir yang sudah ada tidak digandakan.
+          Hasil impor masuk sebagai <strong>Draf</strong>; aktivasi katalog adalah keputusan founder.
+        </p>
+        <textarea
+          aria-label="Isi CSV milestone"
+          rows={7}
+          style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }}
+          placeholder={CONTOH_CSV_MILESTONE}
+          value={csvMilestone}
+          onChange={(e) => setCsvMilestone(e.target.value)}
+        />
+        <div className="row" style={{ marginTop: 8 }}>
+          <button type="button" className="btn small" disabled={busy === "csv" || !csvMilestone.trim()} onClick={() => void imporCsv("milestone_import", csvMilestone)}>
+            {busy === "csv" ? "Mengimpor…" : "Impor CSV"}
+          </button>
+        </div>
+        {laporanCsv.length > 0 ? (
+          <ul className="muted" style={{ marginTop: 8 }}>
+            {laporanCsv.map((g, i) => (<li key={i}>Baris {g.baris}: {g.alasan}</li>))}
+          </ul>
+        ) : null}
+      </div>
+      )}
 
       {(!bagian || bagian === "promosi") && (
         <KartuPromosi classes={data.classes} onDone={load} />

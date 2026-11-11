@@ -31,6 +31,19 @@ export const TARGET_SUBKATEGORI: Record<string, number> = {
   "Huruf Hijaiyah": 28,
 };
 
+// Target kelengkapan tambahan menurut isi dokumen kurikulum resmi pada
+// Paket Sistem Terpadu (bukan angka prompt): jumlah kelompok/tahap yang
+// memang dimuat dokumennya. Ditampilkan agar kekosongan terlihat; statusnya
+// acuan dokumen, menunggu pengesahan founder sebagai target resmi.
+export const TARGET_DOKUMEN: Array<{ subkategori: string; target: number; keterangan: string }> = [
+  { subkategori: "Mengaji Metode Ummi", target: 1, keterangan: "1 paket metode, Jilid 1–6" },
+  { subkategori: "Gugus Kata", target: 8, keterangan: "8 kelompok kata pada dokumen Bahasa Inggris ZKC" },
+  { subkategori: "Ungkapan", target: 8, keterangan: "8 ungkapan momen pada dokumen Bahasa Inggris ZKC" },
+  { subkategori: "Dialog Situasi", target: 8, keterangan: "8 dialog pada dokumen Bahasa Inggris ZKC" },
+  { subkategori: "Bahan Dasar", target: 11, keterangan: "8 bank kosakata + 3 dialog/ungkapan pada dokumen Bahasa Arab SAM" },
+  { subkategori: "Tangga Menulis Hijaiyah", target: 5, keterangan: "5 tahap tangga pada dokumen Bahasa Arab SAM" },
+];
+
 // Peta pos pemakaian materi acuan (kaidah prompt gabungan): setiap tabel
 // materi wajib punya pos di pembelajaran dan di laporan; yang belum punya
 // pos dinyatakan terbuka sebagai pekerjaan yang belum selesai.

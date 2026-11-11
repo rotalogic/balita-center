@@ -1,10 +1,17 @@
 import type { ReactNode } from "react";
+import type { Metadata } from "next";
 import "./globals.css";
+import { getIdentitas } from "@/lib/sekolah";
 
-export const metadata = {
-  title: "Balita Center",
-  description: "ERP PAUD/Montessori multi-cabang: anak didik, laporan harian, keuangan, SDM, dan portal orang tua Balita Connect.",
-};
+// Judul tab mengikuti identitas lembaga yang terpasang (Pengaturan), bukan
+// nama produk — sesuai identitas resmi lembaga pada kop tiga baris.
+export async function generateMetadata(): Promise<Metadata> {
+  const identitas = await getIdentitas();
+  return {
+    title: identitas.nama_gabungan,
+    description: identitas.tagline_gabungan,
+  };
+}
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

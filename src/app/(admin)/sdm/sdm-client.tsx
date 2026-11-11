@@ -88,6 +88,7 @@ export function SdmClient({ bagian }: { bagian?: string }) {
       <nav aria-label="Kamar-kamar SDM" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
         <a className={bagian === "staf" ? "btn" : "btn secondary"} href="/sdm/staf">Data Staf & Guru</a>
         <a className={bagian === "cuti" ? "btn" : "btn secondary"} href="/sdm/cuti">Cuti / Izin / Lembur</a>
+        <a className="btn secondary" href="/absensi/guru">Absensi Guru</a>
         <a className="btn secondary" href="/sdm/kompetensi">Kompetensi Guru</a>
         <a className="btn secondary" href="/sdm/probation">Probation</a>
         <a className="btn secondary" href="/sdm/rekrutmen">Rekrutmen</a>

@@ -13,7 +13,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     if (child.length === 0) {
       return NextResponse.json({ ok: false, error: "Anak tidak ditemukan." }, { status: 404 });
     }
-    const [guardians, enrollment, reports, health, development, milestones, observations] = await Promise.all([
+    const [guardians, enrollment, reports, health, development, milestones, observations, rapor] = await Promise.all([
       query(
         `SELECT g.* FROM child_guardians cg JOIN guardians g ON g.id = cg.guardian_id
           WHERE cg.child_id = $1 ORDER BY cg.is_primary DESC`,
@@ -25,7 +25,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
           WHERE e.child_id = $1 ORDER BY e.start_date DESC LIMIT 1`,
         [params.id]
       ),
-      query("SELECT id, report_date, status, mood FROM daily_reports WHERE child_id = $1 AND deleted_at IS NULL ORDER BY report_date DESC LIMIT 5", [params.id]),
+      query("SELECT id, report_date, status, mood FROM daily_reports WHERE child_id = $1 AND deleted_at IS NULL ORDER BY report_date DESC LIMIT 24", [params.id]),
       query("SELECT * FROM health_checks WHERE child_id = $1 ORDER BY checked_on DESC LIMIT 5", [params.id]),
       query("SELECT * FROM child_development_records WHERE child_id = $1 ORDER BY recorded_on DESC LIMIT 3", [params.id]),
       query("SELECT * FROM student_milestones WHERE child_id = $1 ORDER BY achieved_on DESC LIMIT 10", [params.id]),
@@ -35,8 +35,20 @@ export async function GET(_request: Request, { params }: { params: { id: string 
           WHERE mo.child_id = $1 ORDER BY mo.observed_on DESC, mo.created_at DESC LIMIT 10`,
         [params.id]
       ),
+      query(
+        `SELECT cr.id, cr.status, cr.created_at, cr.published_at, cr.diperiksa_at, cr.disetujui_at,
+                lc.theme AS cycle_theme, lc.start_date::text AS cycle_start, lc.end_date::text AS cycle_end,
+                buat.full_name AS dibuat_oleh, periksa.full_name AS diperiksa_oleh_nama, setuju.full_name AS disetujui_oleh_nama
+           FROM cycle_reports cr
+           JOIN learning_cycles lc ON lc.id = cr.cycle_id
+           LEFT JOIN staff buat ON buat.id = cr.created_by
+           LEFT JOIN users periksa ON periksa.id = cr.diperiksa_oleh
+           LEFT JOIN users setuju ON setuju.id = cr.disetujui_oleh
+          WHERE cr.child_id = $1 ORDER BY lc.start_date DESC LIMIT 12`,
+        [params.id]
+      ),
     ]);
-    return NextResponse.json({ ok: true, child: child[0], guardians, enrollment: enrollment[0] || null, reports, health, development, milestones, observations });
+    return NextResponse.json({ ok: true, child: child[0], guardians, enrollment: enrollment[0] || null, reports, health, development, milestones, observations, rapor });
   } catch (error) {
     return NextResponse.json({ ok: false, error: dbErrorMessage(error) }, { status: 503 });
   }

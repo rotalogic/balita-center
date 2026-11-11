@@ -132,6 +132,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, id: rows[0].id });
     }
 
+
+// Pengurai CSV sadar tanda kutip (pemisah ; atau tab) — bidang resmi lembaga
+// boleh memuat ";" di dalam tanda kutip, misalnya indikator material.
+function parseCsvTitikKoma(teks: string): string[][] {
+  const hasil: string[][] = [];
+  let baris: string[] = [];
+  let sel = "";
+  let dalamKutip = false;
+  const t = teks.replace(/\r\n/g, "\n");
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (dalamKutip) {
+      if (c === '"') {
+        if (t[i + 1] === '"') { sel += '"'; i++; } else dalamKutip = false;
+      } else sel += c;
+    } else if (c === '"') dalamKutip = true;
+    else if (c === ";" || c === "\t") { baris.push(sel.trim()); sel = ""; }
+    else if (c === "\n") { baris.push(sel.trim()); hasil.push(baris); baris = []; sel = ""; }
+    else sel += c;
+  }
+  baris.push(sel.trim());
+  hasil.push(baris);
+  return hasil.filter((b) => b.some((x) => x.length > 0));
+}
+
     // Impor CSV: Kelompok Usia;Aspek;Butir  (pemisah ; atau , atau tab)
     if (body.kind === "stppa_import") {
       const teks = (body.csv || "").trim();
@@ -182,6 +207,72 @@ export async function POST(request: Request) {
         entityTable: "stppa_items",
         detail: { masuk, duplikat, gagal: gagal.length },
       });
+      return NextResponse.json({ ok: true, masuk, duplikat, gagal });
+    }
+
+    // Impor CSV Milestone: Kelompok Usia;Aspek;Butir — masuk sebagai DRAF;
+    // aktivasi katalog adalah keputusan founder, bukan akibat impor.
+    if (body.kind === "milestone_import") {
+      const teks = (body.csv || "").trim();
+      if (!teks) return NextResponse.json({ ok: false, error: "Isi CSV masih kosong." }, { status: 400 });
+      const baris = parseCsvTitikKoma(teks);
+      const gagal: Array<{ baris: number; alasan: string; isi: string }> = [];
+      let masuk = 0;
+      let duplikat = 0;
+      for (let i = 0; i < baris.length; i++) {
+        const kolom = baris[i];
+        if (i === 0 && /usia|aspek|butir/i.test(kolom.join(";"))) continue;
+        if (kolom.length < 3) { gagal.push({ baris: i + 1, alasan: "Butuh 3 kolom: Kelompok Usia; Aspek; Butir.", isi: kolom.join(";") }); continue; }
+        const usia = kolom[0];
+        const aspek = kolom[1];
+        const butir = kolom.slice(2).join("; ").trim();
+        if (!KELOMPOK_USIA.includes(usia)) { gagal.push({ baris: i + 1, alasan: `Kelompok usia "${usia}" tidak dikenal (pakai: ${KELOMPOK_USIA.join(", ")}).`, isi: kolom.join(";") }); continue; }
+        if (aspek.length < 2) { gagal.push({ baris: i + 1, alasan: "Aspek wajib diisi.", isi: kolom.join(";") }); continue; }
+        if (butir.length < 5) { gagal.push({ baris: i + 1, alasan: "Butir minimal 5 karakter.", isi: kolom.join(";") }); continue; }
+        const hasil = await query<{ id: string }>(
+          `INSERT INTO milestones (indikator, age_group, aspect, montessori_area, status)
+           SELECT $1::text, $2::text, $3::text, NULL, 'draf'
+            WHERE NOT EXISTS (SELECT 1 FROM milestones WHERE indikator = $1::text)
+           RETURNING id`,
+          [butir, usia, aspek]
+        );
+        if (hasil.length > 0) masuk++; else duplikat++;
+      }
+      await catatAudit(denied.user, { action: "milestone.import", entityTable: "milestones", detail: { masuk, duplikat, gagal: gagal.length } });
+      return NextResponse.json({ ok: true, masuk, duplikat, gagal });
+    }
+
+    // Impor CSV Material SAM: Jenjang;Area;Material;Indikator Standar
+    // Penguasaan;Usia Presentasi Lazim — duplikat dibaca per (nama, jenjang).
+    if (body.kind === "material_import") {
+      const teks = (body.csv || "").trim();
+      if (!teks) return NextResponse.json({ ok: false, error: "Isi CSV masih kosong." }, { status: 400 });
+      const baris = parseCsvTitikKoma(teks);
+      const gagal: Array<{ baris: number; alasan: string; isi: string }> = [];
+      let masuk = 0;
+      let duplikat = 0;
+      for (let i = 0; i < baris.length; i++) {
+        const kolom = baris[i];
+        if (i === 0 && /jenjang|material/i.test(kolom.join(";"))) continue;
+        if (kolom.length < 3) { gagal.push({ baris: i + 1, alasan: "Butuh minimal 3 kolom: Jenjang; Area; Material; Indikator; Usia Presentasi.", isi: kolom.join(";") }); continue; }
+        const jenjang = kolom[0].toUpperCase();
+        const area = kolom[1];
+        const nama = kolom[2];
+        const indikator = kolom[3] || null;
+        const usiaPresentasi = kolom[4] || null;
+        if (!["CASA", "NIDO"].includes(jenjang)) { gagal.push({ baris: i + 1, alasan: `Jenjang "${kolom[0]}" tidak dikenal (pakai CASA atau NIDO).`, isi: kolom.join(";") }); continue; }
+        if (area.length < 2) { gagal.push({ baris: i + 1, alasan: "Area wajib diisi.", isi: kolom.join(";") }); continue; }
+        if (nama.length < 3) { gagal.push({ baris: i + 1, alasan: "Nama material minimal 3 karakter.", isi: kolom.join(";") }); continue; }
+        const hasil = await query<{ id: string }>(
+          `INSERT INTO materials (name, area, jenjang, indikator_penguasaan, usia_presentasi)
+           SELECT $1::text, $2::text, $3::text, $4::text, $5::text
+            WHERE NOT EXISTS (SELECT 1 FROM materials WHERE name = $1::text AND jenjang IS NOT DISTINCT FROM $3::text AND branch_id IS NULL)
+           RETURNING id`,
+          [nama, area, jenjang, indikator, usiaPresentasi]
+        );
+        if (hasil.length > 0) masuk++; else duplikat++;
+      }
+      await catatAudit(denied.user, { action: "material.import", entityTable: "materials", detail: { masuk, duplikat, gagal: gagal.length } });
       return NextResponse.json({ ok: true, masuk, duplikat, gagal });
     }
 

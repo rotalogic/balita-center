@@ -58,6 +58,7 @@ psql "$DATABASE_URL" -f database/migrasi-zkc-tahap2-material.sql
 psql "$DATABASE_URL" -f database/migrasi-zkc-tahap2-kalender.sql
 psql "$DATABASE_URL" -f database/migrasi-zkc-tahap2-dokumentasi.sql
 psql "$DATABASE_URL" -f database/migrasi-zkc-tahap2-deteksi.sql
+psql "$DATABASE_URL" -f database/migrasi-absensi-guru.sql
 ```
 
 Sesudah migrasi, muat berkas impor resmi lembaga (salinannya tersimpan di

@@ -74,7 +74,7 @@ export function MerekAplikasi() {
   return (
     <>
       <span className="brand-mark" aria-hidden="true">✿</span>
-      <span className="brand-name">{identitas?.nama || "Balita Center"}</span>
+      <span className="brand-name">{identitas?.nama_gabungan || identitas?.nama || "Ziel Kids Club & Sekolah Alam Montessori"}</span>
     </>
   );
 }

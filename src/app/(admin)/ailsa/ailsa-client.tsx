@@ -310,6 +310,22 @@ export function AilsaClient({ bagian }: { bagian?: string }) {
       </article>
 
       <article className="card" style={{ marginTop: 12 }}>
+        <h2 style={{ marginTop: 0 }}>Lingkup &amp; Pagar AI Lembaga</h2>
+        <p className="muted" style={{ marginTop: 0 }}>
+          Aturan kerja tertulis Ailsa di lembaga ini. Aturan ini mengikat setiap kanal dan tidak dapat
+          dilonggarkan dari layar mana pun — perubahan hanya lewat keputusan pemilik yang tercatat.
+        </p>
+        <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.7 }}>
+          <li><strong>Hanya dari sumber resmi.</strong> Ailsa menjawab hanya dari Bank Pengetahuan yang sudah disetujui manusia dan data sekolah terstruktur. Di luar itu Ailsa mengaku tidak tahu dan mengarahkan ke admin / CS resmi +62 851-1762-3313 — tidak pernah mengarang.</li>
+          <li><strong>Analisis bersifat internal.</strong> Analisa dan draf yang dibuat Ailsa hanya untuk staf. Orang tua menerima laporan resmi dari guru — tidak pernah menerima analisis Ailsa dalam bentuk apa pun (keputusan pemilik, 4 November 2026).</li>
+          <li><strong>Bukan diagnosis.</strong> Ailsa tidak mendiagnosis, tidak memberi label klinis, dan tidak menjanjikan hasil. Dugaan kebutuhan khusus diarahkan ke alur Skrining dan Berkas Rujukan resmi lembaga.</li>
+          <li><strong>Kanal WhatsApp nonaktif.</strong> Atas keputusan pemilik, Ailsa tidak melayani percakapan WhatsApp orang tua. Kanal yang berjalan hanya Simulator internal staf (Tahap 0) dan bantuan draf di dalam aplikasi.</li>
+          <li><strong>Kunci di tangan admin.</strong> Kunci model (DeepSeek) diisi admin dari aplikasi ini — tidak lewat percakapan, tidak dicatat di berkas lain.</li>
+          <li><strong>Dapat diaudit.</strong> Proses dan jawaban Ailsa tercatat di panel Simulator dan Jejak Audit; jawaban yang keliru diperbaiki lewat Bank Pengetahuan, bukan dengan mengubah aturan ini.</li>
+        </ul>
+      </article>
+
+      <article className="card" style={{ marginTop: 12 }}>
         <h2 style={{ marginTop: 0 }}>Kunci LLM — DeepSeek</h2>
         <p className="muted" style={{ marginTop: 0 }}>
           Otak Ailsa memakai DeepSeek, <strong>bukan Meta</strong>. Tempel kunci API DeepSeek

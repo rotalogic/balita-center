@@ -18,7 +18,23 @@ type Meta = {
   milestones: Array<{ id: string; indikator: string; age_group: string; aspect: string; montessori_area: string | null; status: string }>;
   materialMilestones: Array<{ material_id: string; milestone_id: string }>;
 };
-type Child = { id: string; full_name: string; branch_name: string };
+type Child = { id: string; full_name: string; branch_name: string; birth_date?: string | null };
+
+const KELOMPOK_USIA_EDITOR = ["0-1 tahun", "1-2 tahun", "2-3 tahun", "3-4 tahun", "4-5 tahun", "5-6 tahun"];
+
+// Usia anak pada tanggal laporan + kelompok usia katalognya — dipakai untuk
+// menampilkan usia secara otomatis dan menyaring pilihan milestone.
+function usiaAnak(birth: string | null | undefined, pada: string): { teks: string; kelompok: string } | null {
+  if (!birth) return null;
+  const lahir = new Date(`${String(birth).slice(0, 10)}T00:00:00`);
+  const acuan = new Date(`${(pada || "").slice(0, 10) || new Date().toISOString().slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(lahir.getTime()) || Number.isNaN(acuan.getTime())) return null;
+  let bulan = (acuan.getFullYear() - lahir.getFullYear()) * 12 + (acuan.getMonth() - lahir.getMonth());
+  if (acuan.getDate() < lahir.getDate()) bulan--;
+  if (bulan < 0) return null;
+  const tahun = Math.floor(bulan / 12);
+  return { teks: `${tahun} tahun ${bulan % 12} bulan`, kelompok: KELOMPOK_USIA_EDITOR[Math.min(tahun, 5)] };
+}
 type GaleriItem = { url: string; media_type: "image" | "video"; mime_type?: string; poster_url?: string };
 type Activity = { title: string; apparatus: string; area: string; rating: string; photo_url: string; activity_time: string; notes: string; work_location: string; work_mode: string; material_id: string; milestone_id: string };
 const emptyActivity: Activity = { title: "", apparatus: "", area: "", rating: "", photo_url: "", activity_time: "", notes: "", work_location: "", work_mode: "", material_id: "", milestone_id: "" };
@@ -32,6 +48,7 @@ const MOODS = [["sedih", "😢 Sedih"], ["cemas", "😟 Cemas"], ["biasa", "😐
 export default function BuatDailyReportPage() {
   const [meta, setMeta] = useState<Meta>({ branches: [], classes: [], staff: [], materials: [], milestones: [], materialMilestones: [] });
   const [children, setChildren] = useState<Child[]>([]);
+  const [saringUsia, setSaringUsia] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string>>({ report_date: new Date().toISOString().slice(0, 10), meal_level: "banyak", snack_level: "banyak", nap_quality: "baik", mood: "ceria" });
   const [activities, setActivities] = useState<Activity[]>([{ ...emptyActivity }]);
@@ -179,6 +196,9 @@ export default function BuatDailyReportPage() {
   const staffFor = meta.staff.filter((s) => !form.branch_id || s.branch_id === form.branch_id);
   const teacherName = staffFor.find((s) => s.id === form.created_by)?.full_name || "";
   const childName = children.find((c) => c.id === form.child_id)?.full_name || "";
+  const anakTerpilih = children.find((c) => c.id === form.child_id);
+  const usia = usiaAnak(anakTerpilih?.birth_date, form.report_date);
+  const kelompokEfektif = saringUsia === "semua" ? "" : (saringUsia || usia?.kelompok || "");
   const timeline = activities.filter((a) => a.title || a.activity_time).slice().sort((a, b) => (a.activity_time || "99").localeCompare(b.activity_time || "99"));
 
   const syarat = useMemo(
@@ -196,12 +216,19 @@ export default function BuatDailyReportPage() {
     a.material_id ? meta.materialMilestones.filter((mm) => mm.material_id === a.material_id).map((mm) => mm.milestone_id) : [];
   const milestoneTersedia = (a: Activity) => {
     const terkait = milestoneTerkait(a);
-    if (terkait.length > 0) return meta.milestones.filter((m) => terkait.includes(m.id));
-    if (a.area && a.area !== "observasi") {
+    let daftar: Meta["milestones"];
+    if (terkait.length > 0) daftar = meta.milestones.filter((m) => terkait.includes(m.id));
+    else if (a.area && a.area !== "observasi") {
       const searea = meta.milestones.filter((m) => m.montessori_area === a.area);
-      if (searea.length > 0) return searea;
+      daftar = searea.length > 0 ? searea : meta.milestones;
+    } else daftar = meta.milestones;
+    // Saringan usia: utamakan kelompok usia anak (atau pilihan guru); milestone
+    // yang terpetakan dari material dan yang sudah terpilih tidak pernah hilang.
+    if (kelompokEfektif) {
+      const tersaring = daftar.filter((m) => m.age_group === kelompokEfektif || terkait.includes(m.id) || m.id === a.milestone_id);
+      if (tersaring.length > 0) return tersaring;
     }
-    return meta.milestones;
+    return daftar;
   };
   const pilihMaterial = (i: number, id: string) => {
     if (!id) { setActivity(i, { material_id: "" }); return; }
@@ -379,6 +406,19 @@ export default function BuatDailyReportPage() {
               <div className="field"><label htmlFor="report_date">Tanggal Laporan *</label>
                 <input id="report_date" type="date" value={form.report_date} onChange={(e) => set("report_date", e.target.value)} /></div>
             </div>
+            {anakTerpilih ? (
+              <div className="row" style={{ marginTop: 10, gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                <span className="badge">{usia ? `Usia anak: ${usia.teks} · kelompok ${usia.kelompok}` : "Tanggal lahir anak belum tercatat — saringan usia tidak aktif"}</span>
+                <label className="row" style={{ gap: 6, alignItems: "center" }}>
+                  Saringan milestone
+                  <select aria-label="Saringan kelompok usia milestone" value={saringUsia} onChange={(e) => setSaringUsia(e.target.value)}>
+                    <option value="">Ikut kelompok usia anak</option>
+                    <option value="semua">Semua kelompok usia</option>
+                    {KELOMPOK_USIA_EDITOR.map((k) => (<option key={k} value={k}>{k}</option>))}
+                  </select>
+                </label>
+              </div>
+            ) : null}
 
             <h2 style={{ marginTop: 22 }}>1. Makan &amp; Minum</h2>
             <div className="form-grid">

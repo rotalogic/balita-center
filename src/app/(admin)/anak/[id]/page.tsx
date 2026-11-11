@@ -21,7 +21,19 @@ type Payload = {
   development: Row[];
   milestones: Row[];
   observations: Row[];
+  rapor: Array<{
+    id: string; status: string; created_at: string; published_at: string | null;
+    diperiksa_at: string | null; disetujui_at: string | null;
+    cycle_theme: string | null; cycle_start: string; cycle_end: string;
+    dibuat_oleh: string | null; diperiksa_oleh_nama: string | null; disetujui_oleh_nama: string | null;
+  }>;
 };
+
+const TAHAP_RAPOR = ["Draf Guru", "Diperiksa Manager", "Disetujui Founder", "Terbit"] as const;
+function tahapRaporSelesai(status: string, indeks: number): boolean {
+  const urutan: Record<string, number> = { draft: 0, diperiksa: 1, disetujui: 2, published: 3 };
+  return (urutan[status] ?? 0) >= indeks;
+}
 
 const TABS = ["Profil Anak", "Pendidikan & STPPA", "Kesehatan", "Laporan & Perkembangan"] as const;
 const LABEL_GENDER: Record<string, string> = {
@@ -418,6 +430,71 @@ export default function DetailAnakPage() {
           </article>
         </section>
 
+
+        <article className="card" style={{ marginTop: 16 }}>
+          <h2>Meja Laporan Terpadu</h2>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Seluruh laporan anak ini dalam satu meja: laporan harian terbaru dan rapor berkala beserta
+            riwayat persetujuan empat tahapnya (Draf Guru → Diperiksa Manager → Disetujui Founder → Terbit).
+          </p>
+          <div className="grid two">
+            <div>
+              <h3 style={{ marginTop: 0 }}>Laporan Harian ({data.reports.length})</h3>
+              {data.reports.length === 0 ? (
+                <p className="muted">Belum ada laporan harian.</p>
+              ) : (
+                <ul className="timeline">
+                  {data.reports.map((r) => (
+                    <li key={r.id}>
+                      <time>{new Date(r.report_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}</time>
+                      <div>
+                        <strong>{r.status.replace(/_/g, " ")}</strong>
+                        <div><a href={`/daily-reports/${r.id}`}>Buka laporan</a></div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div>
+              <h3 style={{ marginTop: 0 }}>Rapor Berkala ({(data.rapor || []).length})</h3>
+              {(data.rapor || []).length === 0 ? (
+                <p className="muted">Belum ada rapor untuk anak ini.</p>
+              ) : (
+                <div>
+                  {(data.rapor || []).map((r) => (
+                    <div key={r.id} style={{ padding: "10px 0", borderTop: "1px solid var(--line)" }}>
+                      <div className="row spread">
+                        <strong>{r.cycle_theme || "Siklus"}</strong>
+                        <a href={`/rapor/${r.id}`}>Buka rapor</a>
+                      </div>
+                      <div className="muted">
+                        {new Date(`${r.cycle_start}T00:00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                        {" – "}
+                        {new Date(`${r.cycle_end}T00:00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                      </div>
+                      <div className="row" style={{ gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+                        {TAHAP_RAPOR.map((tahap, i) => {
+                          const selesai = tahapRaporSelesai(r.status, i);
+                          const keterangan =
+                            i === 0 ? [r.dibuat_oleh, r.created_at ? new Date(r.created_at).toLocaleDateString("id-ID") : null].filter(Boolean).join(" · ")
+                            : i === 1 ? [r.diperiksa_oleh_nama, r.diperiksa_at ? new Date(r.diperiksa_at).toLocaleDateString("id-ID") : null].filter(Boolean).join(" · ")
+                            : i === 2 ? [r.disetujui_oleh_nama, r.disetujui_at ? new Date(r.disetujui_at).toLocaleDateString("id-ID") : null].filter(Boolean).join(" · ")
+                            : r.published_at ? new Date(r.published_at).toLocaleDateString("id-ID") : "";
+                          return (
+                            <span key={tahap} className={selesai ? "badge ok" : "badge"} title={keterangan || undefined}>
+                              {selesai ? "✓ " : ""}{tahap}{keterangan ? ` — ${keterangan}` : ""}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </article>
         <article className="card" style={{ marginTop: 16 }}>
           <h2>Catat Perkembangan Berkala</h2>
           <p className="muted">Nilai capaian per aspek dalam persen (0–100). Isi aspek yang dinilai saja; kosongkan yang belum dinilai pada periode ini.</p>

@@ -81,6 +81,10 @@ export default function AbsensiPage() {
   return (
     <>
       <PageHead title="Absensi" subtitle="Catat kehadiran anak per kelas dan tanggal" />
+      <div className="row" style={{ marginBottom: 12 }}>
+        <a className="btn" href="/absensi">Absensi Anak</a>
+        <a className="btn secondary" href="/absensi/guru">Absensi Guru</a>
+      </div>
       {error ? <ErrorState message={error} /> : null}
       {info ? <p className="success" role="status">{info}</p> : null}
 

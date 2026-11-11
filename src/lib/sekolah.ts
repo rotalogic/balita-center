@@ -23,10 +23,10 @@ export type Identitas = {
 };
 
 const BAWAAN: Identitas = {
-  nama: "Balita Center",
+  nama: "Ziel Kids Club",
   tagline: "Montessori & Childcare",
   alamat: null,
-  telepon: null,
+  telepon: "+62 851-1762-3313",
   email: null,
   logo_url: null,
   nama_yayasan: "Yayasan Tunas Pelita Cakrawala Insani",

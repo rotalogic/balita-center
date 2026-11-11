@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { EmptyState, ErrorState, LoadingState, PageHead } from "@/components/chrome";
 import { kirimJson } from "@/lib/http";
-import { KATEGORI_BAHAN_AJAR, SUBKATEGORI_RESAMI, TARGET_SUBKATEGORI, labelKategoriBahanAjar } from "@/lib/bahan-ajar";
+import { KATEGORI_BAHAN_AJAR, SUBKATEGORI_RESAMI, TARGET_SUBKATEGORI, TARGET_DOKUMEN, labelKategoriBahanAjar } from "@/lib/bahan-ajar";
 
 // Kamar Bahan Ajar & Program Khusus (kerangka Tahap 2). Struktur dan
 // formulirnya lengkap; isi resminya dimuat dari Paket Sistem Terpadu
@@ -177,6 +177,13 @@ export function BahanAjarClient({ bagian }: { bagian?: string }) {
           {Object.entries(TARGET_SUBKATEGORI).map(([sub, target]) => {
             const ada = (bahan || []).filter((b) => b.subkategori === sub).length;
             return (<span key={sub} className={ada >= target ? "badge ok" : "badge"}>{sub}: {ada}/{target}</span>);
+          })}
+        </div>
+        <div className="row" style={{ marginTop: 8, gap: 6, flexWrap: "wrap" }}>
+          <span className="muted">Kelengkapan menurut dokumen kurikulum (Ummi, Inggris, Arab):</span>
+          {TARGET_DOKUMEN.map((t) => {
+            const ada = (bahan || []).filter((b) => b.subkategori === t.subkategori).length;
+            return (<span key={t.subkategori} className={ada >= t.target ? "badge ok" : "badge"} title={t.keterangan}>{t.subkategori}: {ada}/{t.target}</span>);
           })}
         </div>
         {!bahan ? <LoadingState /> : bahanTampil.length === 0 ? (
