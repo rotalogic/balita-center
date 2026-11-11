@@ -227,8 +227,9 @@ OpenWA adalah gateway WhatsApp mandiri (bukan kanal resmi Meta) dari
 github.com/rmyndharis/OpenWA. Balita Center hanya menjadi klien API-nya.
 
 1. Jalankan OpenWA di server yang sama (Docker): `ghcr.io/rmyndharis/openwa`
-   (API + dashboard di port 2785). Buat sesi, mulai sesi, pindai QR dari
-   dashboard OpenWA dengan nomor KHUSUS lembaga — jangan nomor pribadi/utama.
+   (API + dashboard di port 2785). Buat sesi di dashboard OpenWA, lalu
+   pindai QR langsung dari kartu Ailsa (tombol Tampilkan Kode QR) dengan
+   nomor KHUSUS lembaga — jangan nomor pribadi/utama.
 2. Di Balita Center: Ailsa → Kanal & Kunci LLM → kartu "Gateway WhatsApp —
    OpenWA": pilih provider OpenWA, isi Base URL (mis. http://localhost:2785),
    ID sesi, kunci API (X-API-Key dari dashboard OpenWA), lalu aktifkan.
