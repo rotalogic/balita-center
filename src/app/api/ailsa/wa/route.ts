@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { dbErrorMessage, query } from "@/lib/db";
 import { guard } from "@/lib/current-user";
 import { catatAudit } from "@/lib/audit";
-import { segarkanWa, statusOpenwa, ringkasanWa, antrekanWa, prosesSatuPesanWa, waMasker } from "@/lib/wa-gateway";
+import { segarkanWa, statusOpenwa, ringkasanWa, antrekanWa, prosesSatuPesanWa, waMasker, qrOpenwa } from "@/lib/wa-gateway";
 import { contohVariasi } from "@/lib/wa-variasi";
 
 export const dynamic = "force-dynamic";
@@ -96,6 +96,10 @@ export async function POST(request: Request) {
       if (!hasil.ok) return NextResponse.json({ ok: false, error: hasil.reason }, { status: 400 });
       await catatAudit(denied.user, { action: "ailsa.wa.uji", entityTable: "wa_outbox", entityId: hasil.id, detail: { nomor } });
       return NextResponse.json({ ok: true, id: hasil.id });
+    }
+    if (aksi === "qr") {
+      const hasil = await qrOpenwa();
+      return NextResponse.json({ ok: true, ...hasil });
     }
     if (aksi === "proses") {
       const hasil = await prosesSatuPesanWa();

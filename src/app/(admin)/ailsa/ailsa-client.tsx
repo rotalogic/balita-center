@@ -43,6 +43,8 @@ function KartuOpenWa() {
   const [contoh, setContoh] = useState<string[]>([]);
   const [pesan, setPesan] = useState<{ ok: boolean; text: string } | null>(null);
   const [sibuk, setSibuk] = useState(false);
+  const [qr, setQr] = useState<{ status: string; qrCode?: string; terhubung: boolean; pesan?: string } | null>(null);
+  const [tampilQr, setTampilQr] = useState(false);
 
   const muat = useCallback(async () => {
     const r = await fetch("/api/ailsa/wa");
@@ -105,6 +107,22 @@ function KartuOpenWa() {
     void muat();
   }
 
+  async function ambilQr() {
+    const d = await kirim({ aksi: "qr" });
+    if (!d.ok) { setPesan({ ok: false, text: String(d.error || "Gagal mengambil kode QR.") }); return; }
+    setQr({ status: String(d.status || ""), qrCode: d.qrCode as string | undefined, terhubung: Boolean(d.terhubung), pesan: d.pesan as string | undefined });
+    if (d.terhubung) void muat();
+  }
+
+  // Kode QR berganti berkala — segarkan otomatis selama panel tampil dan
+  // sesi belum terhubung.
+  useEffect(() => {
+    if (!tampilQr || (qr && qr.terhubung)) return;
+    const id = setInterval(() => { void ambilQr(); }, 15000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tampilQr, qr?.terhubung, qr?.status]);
+
   const a = data?.antrean;
   return (
     <article className="card" style={{ marginTop: 12 }}>
@@ -146,7 +164,7 @@ function KartuOpenWa() {
       </div>
       <div className="row" style={{ marginTop: 8 }}>
         <button type="button" className="btn" disabled={sibuk} onClick={() => void simpan()}>{sibuk ? "Menyimpan…" : "Simpan Pengaturan WA"}</button>
-        {form.baseUrl ? <a className="btn secondary" href={form.baseUrl} target="_blank" rel="noreferrer">Buka Dashboard OpenWA (pasangkan QR di sana)</a> : null}
+        {form.baseUrl ? <a className="btn secondary" href={form.baseUrl} target="_blank" rel="noreferrer">Buka Dashboard OpenWA (alternatif)</a> : null}
       </div>
       {data ? (
         <p className="muted" style={{ marginBottom: 0 }}>
@@ -160,6 +178,42 @@ function KartuOpenWa() {
           {" · "}Kelompok berjalan: {a?.hitungan_batch ?? 0}/10 pesan
           {a?.jeda_sampai && new Date(a.jeda_sampai).getTime() > Date.now() ? ` · jeda kelompok sampai ${new Date(a.jeda_sampai).toLocaleTimeString("id-ID")}` : ""}
         </p>
+      ) : null}
+
+      <h3 style={{ marginBottom: 4 }}>Hubungkan WhatsApp — Kode QR</h3>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Pasangkan nomor khusus lembaga langsung dari sini, tanpa membuka dashboard OpenWA:
+        tampilkan kode QR, lalu di ponsel nomor itu buka <strong>WhatsApp → Setelan → Perangkat tertaut →
+        Tautkan perangkat</strong> dan pindai kodenya. Kode diperbarui otomatis tiap 15 detik selama panel ini tampil.
+      </p>
+      <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+        <button type="button" className="btn secondary" disabled={sibuk}
+          onClick={() => { if (tampilQr) { setTampilQr(false); } else { setTampilQr(true); void ambilQr(); } }}>
+          {tampilQr ? "Sembunyikan Kode QR" : "Tampilkan Kode QR"}
+        </button>
+        {tampilQr ? (
+          <button type="button" className="btn secondary" disabled={sibuk} onClick={() => void ambilQr()}>Segarkan Sekarang</button>
+        ) : null}
+      </div>
+      {tampilQr ? (
+        qr?.terhubung || data?.statusGateway?.terhubung ? (
+          <p className="success" role="status" style={{ marginTop: 10 }}>
+            WhatsApp terhubung{data?.statusGateway?.nama ? ` — ${data.statusGateway.nama}` : ""}. Nomor siap dipakai gateway.
+          </p>
+        ) : qr?.qrCode ? (
+          <div style={{ marginTop: 10, textAlign: "center" }}>
+            {/* Kode QR resmi dari gateway (data URL gambar) */}
+            <img src={qr.qrCode} alt="Kode QR pemasangan WhatsApp OpenWA" width={264} height={264}
+              style={{ border: "1px solid #ddd", borderRadius: 8, background: "#fff" }} />
+            <p className="muted" style={{ margin: "6px 0 0" }}>
+              Status sesi: {qr.status}. Pindai dengan nomor khusus lembaga — sesudah terhubung, panel ini berubah sendiri.
+            </p>
+          </div>
+        ) : (
+          <p className="muted" role="status" style={{ marginTop: 10 }}>
+            {qr?.pesan || "Menghubungi gateway untuk menyiapkan kode QR…"}
+          </p>
+        )
       ) : null}
 
       <h3 style={{ marginBottom: 4 }}>Ritme Pengiriman (aturan tetap)</h3>

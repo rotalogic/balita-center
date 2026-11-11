@@ -93,10 +93,67 @@ export async function statusOpenwa(): Promise<{ terhubung: boolean; status: stri
     const { ok, data } = await panggilOpenwa(k, `/api/sessions/${encodeURIComponent(k.sessionId)}`);
     if (!ok) return { terhubung: false, status: "gateway_tidak_menjawab" };
     const mentah = String(data.status || data.state || "");
-    const terhubung = /connect|ready|open|authenticated|online/i.test(mentah);
+    // Status OpenWA: sesi yang benar-benar terhubung berstatus persis
+    // "ready" — "qr_ready" berarti justru MENUNGGU dipindai, bukan terhubung.
+    const kecil = mentah.toLowerCase();
+    const terhubung = kecil === "ready" || kecil === "connected";
     return { terhubung, status: mentah || "tidak_diketahui", nama: typeof data.name === "string" ? data.name : undefined };
   } catch {
     return { terhubung: false, status: "gateway_tidak_terjangkau" };
+  }
+}
+
+// Mulai sesi di gateway (idempoten secara praktik: gateway menolak start
+// ganda dengan galat yang aman diabaikan di sini).
+export async function mulaiSesiOpenwa(): Promise<void> {
+  const k = await segarkanWa();
+  if (!k.baseUrl || !k.apiKey || !k.sessionId) return;
+  try {
+    await panggilOpenwa(k, `/api/sessions/${encodeURIComponent(k.sessionId)}/start`, { method: "POST" });
+  } catch {
+    /* gateway tak terjangkau — status sesungguhnya terbaca dari panggilan lain */
+  }
+}
+
+export type HasilQr = {
+  status: string;           // status sesi menurut gateway (qr_ready, ready, initializing, ...)
+  qrCode?: string;          // data URL gambar QR, siap ditampilkan
+  terhubung: boolean;
+  pesan?: string;           // penjelasan ramah untuk admin
+};
+
+// Ambil kode QR pemasangan dari gateway. Bila sesi belum berjalan, sesi
+// dimulai dulu. QR OpenWA berbentuk data URL gambar (kontrak QRCodeResponseDto).
+export async function qrOpenwa(): Promise<HasilQr> {
+  const k = await segarkanWa(true);
+  if (!k.baseUrl || !k.apiKey || !k.sessionId) {
+    return { status: "belum_diatur", terhubung: false, pesan: "Isi dulu Base URL, ID sesi, dan kunci API OpenWA, lalu simpan." };
+  }
+  const sesi = `/api/sessions/${encodeURIComponent(k.sessionId)}`;
+  try {
+    let st = await statusOpenwa();
+    if (st.terhubung) return { status: st.status, terhubung: true, pesan: "WhatsApp sudah terhubung — tidak perlu memindai lagi." };
+    const kecil = st.status.toLowerCase();
+    if (kecil === "created" || kecil === "disconnected" || kecil === "failed" || kecil === "belum_diatur" || kecil === "gateway_tidak_menjawab") {
+      await mulaiSesiOpenwa();
+      await new Promise((r) => setTimeout(r, 1500));
+      st = await statusOpenwa();
+      if (st.terhubung) return { status: st.status, terhubung: true, pesan: "WhatsApp sudah terhubung — tidak perlu memindai lagi." };
+    }
+    const { ok, data } = await panggilOpenwa(k, `${sesi}/qr`);
+    if (ok && typeof data.qrCode === "string" && data.qrCode.startsWith("data:image/")) {
+      return { status: String(data.status || st.status), qrCode: data.qrCode, terhubung: false };
+    }
+    // QR tidak tersedia: mungkin sesi baru saja terhubung, atau masih menyiapkan.
+    const st2 = await statusOpenwa();
+    if (st2.terhubung) return { status: st2.status, terhubung: true, pesan: "WhatsApp sudah terhubung — tidak perlu memindai lagi." };
+    return {
+      status: st2.status,
+      terhubung: false,
+      pesan: `Kode QR belum siap (status sesi: ${st2.status}). Tunggu beberapa detik lalu segarkan — halaman ini menyegarkan otomatis.`,
+    };
+  } catch {
+    return { status: "gateway_tidak_terjangkau", terhubung: false, pesan: "Gateway OpenWA tidak terjangkau. Periksa Base URL dan pastikan gateway berjalan." };
   }
 }
 
