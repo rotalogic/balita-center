@@ -105,6 +105,12 @@ export async function GET(request: Request) {
         [childId]
       ),
     ]);
+    const segments = report[0]?.id
+      ? await query(
+          "SELECT segmen, catatan FROM daily_report_segments WHERE report_id = $1",
+          [String((report[0] as { id: string }).id)]
+        )
+      : [];
     const wali = childId
       ? await query<{ full_name: string }>(
           `SELECT g.full_name FROM child_guardians cg JOIN guardians g ON g.id = cg.guardian_id
@@ -120,6 +126,7 @@ export async function GET(request: Request) {
       child: child[0] || null,
       report: report[0] || null,
       activities,
+      segments,
       health,
       development,
       events,

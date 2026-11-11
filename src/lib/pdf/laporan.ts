@@ -1,10 +1,13 @@
 import PDFDocument from "pdfkit";
+import { kataSkor } from "../skala";
+import { SEGMEN_ZKC } from "../segmen";
 
 // PDF laporan harian: berkas sungguhan dari data laporan (bukan tangkapan layar).
 // Susunan dan warnanya mengikuti halaman web laporan (components/laporan-web.tsx)
 // dan portal lama sekolah: pita tanggal biru muda + pill mood, kartu aktivitas
-// berbintang 1-4 dengan chip area/lokasi/mode, kartu Makan/Tidur/Toilet,
-// Catatan Tambahan, Circle Time, Moment Special, Saran di Rumah, kaki pelapor.
+// dengan penilaian kata (tanpa bintang) dan chip area/lokasi/mode, kartu
+// Makan/Tidur/Toilet, Catatan Tambahan, Circle Time, Moment Special,
+// Saran di Rumah, kaki pelapor.
 type Data = {
   child_name: string; class_name: string | null; branch_name: string; report_date: string;
   teacher: string | null; mood: string | null; meals_text: string | null; meal_level: string | null;
@@ -16,6 +19,8 @@ type Data = {
     title: string; apparatus: string | null; area: string | null; rating: number | null;
     activity_time: string | null; notes: string | null; work_location: string | null; work_mode: string | null;
   }>;
+  // Catatan per segmen sesi resmi ZKC (9 segmen); hanya yang terisi digambar.
+  segments?: Array<{ segmen: string; catatan: string }>;
   // Foto aktivitas (buffer gambar) sejajar urutan activities; null bila tidak ada/gagal dimuat.
   photos?: Array<Buffer | null>;
   // Ilustrasi sampul resmi (public/ilustrasi/sampul-laporan.jpg) — digambar
@@ -24,6 +29,7 @@ type Data = {
   ttd?: Buffer | null; // tanda tangan digital fasilitator utama
   logo?: Buffer | null; // logo sekolah dari identitas (digambar di bagian atas)
   sekolah_kop?: string; // baris kop identitas, mis. "BALITA CENTER — MONTESSORI & CHILDCARE"
+  kop_baris?: [string, string, string]; // kop resmi tiga baris (yayasan, nama gabungan, tagline gabungan)
 };
 
 const AREA: Record<string, string> = {
@@ -65,31 +71,15 @@ const jamTitik = (v: string | null) => {
   return m ? `${m[1].padStart(2, "0")}.${m[2]}` : "";
 };
 
-// Bintang digambar sebagai jalur vektor: font standar PDF tidak punya glif bintang.
-function gambarBintang(doc: PDFKit.PDFDocument, cx: number, cy: number, r: number, terisi: boolean) {
-  const titik: Array<[number, number]> = [];
-  for (let i = 0; i < 10; i++) {
-    const sudut = -Math.PI / 2 + (i * Math.PI) / 5;
-    const jari = i % 2 === 0 ? r : r * 0.45;
-    titik.push([cx + jari * Math.cos(sudut), cy + jari * Math.sin(sudut)]);
-  }
-  doc.save();
-  doc.path(titik.map(([x, y], i) => `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`).join(" ") + " Z");
-  if (terisi) doc.fill(W.emas); else doc.strokeColor(W.emasPudar).lineWidth(0.8).stroke();
-  doc.restore();
-}
-
-function barisBintang(doc: PDFKit.PDFDocument, xKanan: number, y: number, n: number, r = 5) {
-  const v = Math.max(0, Math.min(4, Math.round(Number(n) || 0)));
-  doc.fontSize(8).font("Helvetica").fillColor("#68727d");
-  const teksSkor = `${v}/4`;
-  const lebarSkor = doc.widthOfString(teksSkor) + 5;
-  doc.text(teksSkor, xKanan - lebarSkor, y - 3, { width: lebarSkor, align: "right" });
-  const langkah = r * 2 + 3.5;
-  for (let i = 0; i < 4; i++) {
-    gambarBintang(doc, xKanan - lebarSkor - langkah * (4 - i) + r, y, r, i < v);
-  }
-  return lebarSkor + langkah * 4;
+// Penilaian ditulis sebagai kata resmi (Belum Mampu / Mulai Mampu / Mandiri),
+// rata kanan pada kepala kartu aktivitas. Tanpa bintang dalam bentuk apa pun.
+function barisKata(doc: PDFKit.PDFDocument, xKanan: number, y: number, n: number) {
+  const kata = kataSkor(n);
+  if (!kata) return 0;
+  doc.fontSize(8.5).font("Helvetica-Bold").fillColor("#4a6741");
+  const lebarKata = doc.widthOfString(kata);
+  doc.text(kata, xKanan - lebarKata, y - 3, { width: lebarKata, align: "right" });
+  return lebarKata;
 }
 
 export function buatPdfLaporan(d: Data): PDFKit.PDFDocument {
@@ -110,8 +100,22 @@ export function buatPdfLaporan(d: Data): PDFKit.PDFDocument {
     return doc.heightOfString(teks, { width: w, lineGap: 1.5 });
   };
 
-  // ---------- Baris merek (logo sekolah) ----------
-  if (d.logo) {
+  // ---------- Kop resmi tiga baris (logo di kiri bila ada) ----------
+  if (d.kop_baris) {
+    const geserKop = d.logo ? 132 : 0;
+    if (d.logo) {
+      try {
+        doc.image(d.logo, kiri, y, { fit: [120, 34], valign: "center" });
+      } catch { /* logo gagal dimuat — kop teks tetap tampil */ }
+    }
+    doc.fillColor("#77828e").font("Helvetica-Bold").fontSize(7.5)
+      .text(d.kop_baris[0].toUpperCase(), kiri + geserKop, y, { width: lebar - geserKop, characterSpacing: 1 });
+    doc.fillColor("#2f353c").font("Helvetica-Bold").fontSize(10.5)
+      .text(d.kop_baris[1], kiri + geserKop, y + 10, { width: lebar - geserKop });
+    doc.fillColor("#77828e").font("Helvetica").fontSize(7.5)
+      .text(d.kop_baris[2], kiri + geserKop, y + 25, { width: lebar - geserKop });
+    y += 42;
+  } else if (d.logo) {
     try {
       doc.image(d.logo, kiri, y, { fit: [120, 30], valign: "center" });
     } catch { /* logo gagal dimuat — laporan tetap terbit */ }
@@ -158,10 +162,30 @@ export function buatPdfLaporan(d: Data): PDFKit.PDFDocument {
     }
   }
 
+  // ---------- Segmen Sesi ZKC ----------
+  const segmenIsi = SEGMEN_ZKC
+    .map((s) => ({ label: s.label, catatan: (d.segments || []).find((x) => x.segmen === s.kunci)?.catatan || "" }))
+    .filter((s) => s.catatan.trim());
+  if (segmenIsi.length > 0) {
+    pastikanRuang(46);
+    doc.fillColor("#33383e").font("Helvetica-Bold").fontSize(11).text("JALANNYA SESI HARI INI", kiri, y);
+    y += 15;
+    doc.fillColor(W.abu).font("Helvetica").fontSize(8.5).text("Sembilan segmen sesi Ziel Kids Club, berurutan dari kedatangan sampai doa penutup", kiri, y);
+    y += 13;
+    segmenIsi.forEach((s, i) => {
+      const teks = `${i + 1}. ${s.label} — ${s.catatan}`;
+      const h = tinggiTeks(teks, "Helvetica", 9.5, lebar);
+      pastikanRuang(h + 6);
+      doc.fillColor("#3c454e").font("Helvetica").fontSize(9.5).text(teks, kiri, y, { width: lebar, lineGap: 1.5 });
+      y += h + 6;
+    });
+    y += 8;
+  }
+
   // ---------- Aktivitas ----------
   doc.fillColor("#33383e").font("Helvetica-Bold").fontSize(11).text("AKTIVITAS & PEMBELAJARAN", kiri, y);
   y += 15;
-  doc.fillColor(W.abu).font("Helvetica").fontSize(8.5).text("Skala penilaian: 1–4 bintang (4 = sempurna)", kiri, y);
+  doc.fillColor(W.abu).font("Helvetica").fontSize(8.5).text("Penilaian memakai kata: Belum Mampu, Mulai Mampu, dan Mandiri", kiri, y);
   y += 14;
 
   if (d.activities.length === 0) {
@@ -202,7 +226,7 @@ export function buatPdfLaporan(d: Data): PDFKit.PDFDocument {
 
     let cy = yKartu + 13;
     doc.fillColor(W.gelap).font("Helvetica-Bold").fontSize(11).text(a.title, kiri + 14, cy, { width: lebarIsi - 130 });
-    if (Number(a.rating) > 0) barisBintang(doc, kiri + lebar - 14, cy + 5, Number(a.rating));
+    if (Number(a.rating) > 0) barisKata(doc, kiri + lebar - 14, cy + 5, Number(a.rating));
     cy += 15;
     if (chips.length) {
       let cx = kiri + 14;
@@ -320,8 +344,7 @@ export function buatPdfLaporan(d: Data): PDFKit.PDFDocument {
       cy += 15;
     }
     if (Number(d.circle_rating) > 0) {
-      const v = Math.max(0, Math.min(4, Math.round(Number(d.circle_rating))));
-      for (let i = 0; i < v; i++) gambarBintang(doc, kiri + 14 + 5 + i * 13, cy + 5, 5, true);
+      doc.fillColor("#4a6741").font("Helvetica-Bold").fontSize(9).text(kataSkor(d.circle_rating), kiri + 14, cy, { width: lebar - 28 });
       cy += 13;
     }
     if (isi) {

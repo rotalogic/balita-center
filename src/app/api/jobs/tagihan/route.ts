@@ -123,6 +123,9 @@ export async function POST(request: Request) {
            JOIN children c ON c.id = e.child_id AND c.deleted_at IS NULL AND c.status = 'aktif'
           WHERE e.status = 'aktif' AND p.monthly_fee > 0
             AND NOT EXISTS (
+              SELECT 1 FROM skema_biaya s
+               WHERE s.id = p.skema_id AND s.status = 'rancangan')
+            AND NOT EXISTS (
               SELECT 1 FROM invoices i
                WHERE i.child_id = e.child_id AND i.period_month = $1::date AND i.status <> 'batal')
          ON CONFLICT DO NOTHING

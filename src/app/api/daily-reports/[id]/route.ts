@@ -4,6 +4,7 @@ import { guard, hasPermission } from "@/lib/current-user";
 import { cekSyaratTerbit } from "@/lib/syarat-terbit";
 import { beda, catatAudit } from "@/lib/audit";
 import { notifLaporanTerbit } from "@/lib/ailsa/notify";
+import { SEGMEN_ZKC } from "@/lib/segmen";
 import { emailLaporanTerbitWali } from "@/lib/beritahu-wali";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +50,7 @@ type PatchBody = {
   activities?: ActivityInput[];
   photo_urls?: string[];
   photos?: Array<{ photo_url: string; media_type?: string; mime_type?: string; poster_url?: string; caption?: string }>;
+  segmen?: Record<string, string>;
 };
 
 const EDITABLE = ["draft", "revisi"];
@@ -86,9 +88,10 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     if (report.length === 0) {
       return NextResponse.json({ ok: false, error: "Laporan tidak ditemukan." }, { status: 404 });
     }
-    const [activities, photos, riwayat] = await Promise.all([
+    const [activities, photos, segments, riwayat] = await Promise.all([
       query("SELECT * FROM daily_report_activities WHERE report_id = $1 ORDER BY sort_order", [params.id]),
       query("SELECT * FROM daily_report_photos WHERE report_id = $1 ORDER BY created_at", [params.id]),
+      query("SELECT segmen, catatan FROM daily_report_segments WHERE report_id = $1", [params.id]),
       query(
         `SELECT a.action, a.detail, a.created_at, u.full_name AS oleh
            FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id
@@ -97,7 +100,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
         [params.id]
       ),
     ]);
-    return NextResponse.json({ ok: true, report: report[0], activities, photos, riwayat });
+    return NextResponse.json({ ok: true, report: report[0], activities, photos, segments, riwayat });
   } catch (error) {
     return NextResponse.json({ ok: false, error: pesanError(error) }, { status: 503 });
   }
@@ -210,7 +213,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if ("mood_notes" in body) add("mood_notes", body.mood_notes || null);
     if ("notes" in body) add("notes", body.notes || null);
     if ("circle_theme" in body) add("circle_theme", body.circle_theme || null);
-    if ("circle_rating" in body) add("circle_rating", body.circle_rating ? Number(body.circle_rating) : null);
+    if ("circle_rating" in body) add("circle_rating", body.circle_rating ? Math.max(1, Math.min(3, Number(body.circle_rating))) : null);
     if ("circle_notes" in body) add("circle_notes", body.circle_notes || null);
     if ("special_moment" in body) add("special_moment", body.special_moment || null);
     if ("home_suggestion" in body) add("home_suggestion", body.home_suggestion || null);
@@ -241,7 +244,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
             activity.area || null,
             activity.apparatus || null,
             activity.title,
-            activity.rating || null,
+            activity.rating ? Math.max(1, Math.min(3, Number(activity.rating))) : null,
             activity.notes || null,
             activity.photo_url || null,
             index,
@@ -260,7 +263,19 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         await query(
           `INSERT INTO milestone_observations (child_id, milestone_id, observed_on, level, report_id, material_id, created_by)
            VALUES ($1,$2::uuid,$3,$4,$5,$6::uuid,$7::uuid)`,
-          [sebelum.child_id, activity.milestone_id, tanggalObs, activity.rating || null, params.id, activity.material_id || null, sebelum.created_by || null]
+          [sebelum.child_id, activity.milestone_id, tanggalObs, activity.rating ? Math.max(1, Math.min(3, Number(activity.rating))) : null, params.id, activity.material_id || null, sebelum.created_by || null]
+        );
+      }
+    }
+
+    if (body.segmen) {
+      await query("DELETE FROM daily_report_segments WHERE report_id = $1", [params.id]);
+      for (const s of SEGMEN_ZKC) {
+        const catatan = String(body.segmen[s.kunci] || "").trim();
+        if (!catatan) continue;
+        await query(
+          "INSERT INTO daily_report_segments (report_id, segmen, catatan) VALUES ($1,$2,$3)",
+          [params.id, s.kunci, catatan]
         );
       }
     }

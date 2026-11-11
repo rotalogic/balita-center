@@ -6,7 +6,7 @@ import { ErrorState, PageHead } from "@/components/chrome";
 
 type Meta = {
   branches: Array<{ id: string; code: string; name: string }>;
-  programs: Array<{ id: string; code: string; name: string }>;
+  programs: Array<{ id: string; code: string; name: string; area?: string }>;
   classes: Array<{ id: string; branch_id: string; program_id: string; name: string }>;
   staff: Array<{ id: string; branch_id: string; full_name: string; position: string }>;
 };
@@ -83,7 +83,7 @@ export default function TambahAnakPage() {
     setSetupMsg(null);
     const payloads: Record<string, Record<string, string>> = {
       branch: { kind, code: setup.branch_code || "", name: setup.branch_name || "", city: setup.branch_city || "" },
-      program: { kind, code: setup.program_code || "", name: setup.program_name || "", monthly_fee: setup.monthly_fee || "", screening_fee: setup.screening_fee || "" },
+      program: { kind, code: setup.program_code || "", name: setup.program_name || "", monthly_fee: setup.monthly_fee || "", screening_fee: setup.screening_fee || "", area: setup.program_area || "ZKC" },
       class: { kind, branch_id: setup.class_branch || "", program_id: setup.class_program || "", name: setup.class_name || "" },
       staff: { kind, branch_id: setup.staff_branch || "", full_name: setup.staff_name || "", position: setup.staff_position || "", phone: setup.staff_phone || "", email: setup.staff_email || "" },
     };
@@ -107,6 +107,7 @@ export default function TambahAnakPage() {
     if (!form.branch_id) nextErrors.branch_id = "Cabang wajib dipilih.";
     if (!form.program_id) nextErrors.program_id = "Program wajib dipilih.";
     if (!form.class_id) nextErrors.class_id = "Kelas wajib dipilih.";
+    if (!form.kategori_program) nextErrors.kategori_program = "Kategori program (ZKC/SAM) wajib dipilih secara tegas.";
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
     setSaving(true);
@@ -151,6 +152,10 @@ export default function TambahAnakPage() {
               <input placeholder="Kode, mis. REG" value={setup.program_code || ""} onChange={(e) => setSetup({ ...setup, program_code: e.target.value })} />
               <input placeholder="Nama program" value={setup.program_name || ""} onChange={(e) => setSetup({ ...setup, program_name: e.target.value })} />
               <input placeholder="SPP" type="number" min="0" value={setup.monthly_fee || ""} onChange={(e) => setSetup({ ...setup, monthly_fee: e.target.value })} />
+              <select value={setup.program_area || "ZKC"} onChange={(e) => setSetup({ ...setup, program_area: e.target.value })} aria-label="Rumah program">
+                <option value="ZKC">Ziel Kids Club</option>
+                <option value="SAM">Sekolah Alam Montessori</option>
+              </select>
               <button type="button" className="btn small" onClick={() => submitSetup("program")}>Simpan Program</button>
             </div>
             <span className="hint">{meta.programs.length} program terdaftar</span>
@@ -270,7 +275,9 @@ export default function TambahAnakPage() {
             </div>
             <div className="form-grid">
               <div className="field"><label htmlFor="branch_id">Cabang *</label><select id="branch_id" value={form.branch_id || ""} onChange={(e) => { set("branch_id", e.target.value); set("class_id", ""); }} required><option value="">Pilih cabang</option>{meta.branches.map((b) => (<option key={b.id} value={b.id}>{b.name}</option>))}</select>{errors.branch_id ? <span className="err">{errors.branch_id}</span> : null}</div>
-              <div className="field"><label htmlFor="program_id">Program *</label><select id="program_id" value={form.program_id || ""} onChange={(e) => { set("program_id", e.target.value); set("class_id", ""); }} required><option value="">Pilih program</option>{meta.programs.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}</select>{errors.program_id ? <span className="err">{errors.program_id}</span> : null}</div>
+              <div className="field"><label htmlFor="program_id">Program *</label><select id="program_id" value={form.program_id || ""} onChange={(e) => { set("program_id", e.target.value); set("class_id", ""); const p = meta.programs.find((x) => x.id === e.target.value); set("kategori_program", p?.area === "SAM" ? "SAM" : "ZKC"); }} required><option value="">Pilih program</option>{meta.programs.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}</select>{errors.program_id ? <span className="err">{errors.program_id}</span> : null}</div>
+              <div className="field"><label htmlFor="kategori_program">Kategori Program *</label><select id="kategori_program" value={form.kategori_program || ""} onChange={(e) => set("kategori_program", e.target.value)} required><option value="">Pilih kategori</option><option value="ZKC">Ziel Kids Club (ZKC)</option><option value="SAM">Sekolah Alam Montessori (SAM)</option></select><span className="hint">Kategori menentukan program, cara pencatatan perkembangan, dan laporan anak. Terisi mengikuti program, tetap wajib ditegaskan.</span>{errors.kategori_program ? <span className="err">{errors.kategori_program}</span> : null}</div>
+              <div className="field"><label htmlFor="label_status">Label Status Anak</label><select id="label_status" value={form.label_status || "Anggota"} onChange={(e) => set("label_status", e.target.value)}>{["Anggota", "Trial", "Insidentil", "Peserta Event", "Klien Skrining", "Klien Konsultasi"].map((l) => (<option key={l} value={l}>{l}</option>))}</select></div>
               <div className="field"><label htmlFor="class_id">Kelas yang Dituju *</label><select id="class_id" value={form.class_id || ""} onChange={(e) => set("class_id", e.target.value)} required><option value="">Pilih kelas</option>{classesFor.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}</select>{classesFor.length === 0 ? (<span className="hint">Belum ada kelas untuk cabang &amp; program ini. Buat dulu di panel <strong>Data Awal</strong> di atas.</span>) : null}{errors.class_id ? <span className="err">{errors.class_id}</span> : null}</div>
               <div className="field"><label htmlFor="enrolled_on">Tanggal Masuk</label><input id="enrolled_on" type="date" value={form.enrolled_on || ""} onChange={(e) => set("enrolled_on", e.target.value)} /></div>
             </div>

@@ -6,6 +6,7 @@ import PDFDocument from "pdfkit";
 export type DataTagihan = {
   sekolah_nama?: string;
   sekolah_tagline?: string;
+  kop_baris?: [string, string, string]; // kop resmi tiga baris (yayasan, nama gabungan, tagline gabungan)
   sekolah_alamat?: string | null;
   sekolah_telepon?: string | null;
   logo?: Buffer | null; // logo sekolah dari identitas
@@ -59,14 +60,25 @@ export function buatPdfTagihan(d: DataTagihan): PDFKit.PDFDocument {
       geserLogo = 102;
     } catch { /* logo gagal dimuat — kop teks tetap tampil */ }
   }
-  doc.fillColor(MARUN).font("Helvetica-Bold").fontSize(17).text((d.sekolah_nama || "Balita Center").toUpperCase(), kiri + geserLogo, y);
-  doc.fillColor(ABU).font("Helvetica").fontSize(9)
-    .text(`${d.sekolah_tagline || "Montessori & Childcare"} — Cabang ${d.branch_name}${d.branch_city ? ` (${d.branch_city})` : ""}${d.sekolah_alamat ? ` · ${d.sekolah_alamat}` : ""}${d.sekolah_telepon ? ` · ${d.sekolah_telepon}` : ""}`, kiri + geserLogo, y + 21, { width: 330 - geserLogo });
+  if (d.kop_baris) {
+    doc.fillColor(ABU).font("Helvetica-Bold").fontSize(7.5)
+      .text(d.kop_baris[0].toUpperCase(), kiri + geserLogo, y, { width: 330 - geserLogo, characterSpacing: 1 });
+    doc.fillColor(MARUN).font("Helvetica-Bold").fontSize(12.5)
+      .text(d.kop_baris[1], kiri + geserLogo, y + 10, { width: 330 - geserLogo });
+    doc.fillColor(ABU).font("Helvetica").fontSize(7.5)
+      .text(d.kop_baris[2], kiri + geserLogo, y + 25, { width: 330 - geserLogo });
+    doc.fillColor(ABU).font("Helvetica").fontSize(8.5)
+      .text(`Cabang ${d.branch_name}${d.branch_city ? ` (${d.branch_city})` : ""}${d.sekolah_alamat ? ` · ${d.sekolah_alamat}` : ""}${d.sekolah_telepon ? ` · ${d.sekolah_telepon}` : ""}`, kiri + geserLogo, y + 36, { width: 330 - geserLogo });
+  } else {
+    doc.fillColor(MARUN).font("Helvetica-Bold").fontSize(17).text((d.sekolah_nama || "Balita Center").toUpperCase(), kiri + geserLogo, y);
+    doc.fillColor(ABU).font("Helvetica").fontSize(9)
+      .text(`${d.sekolah_tagline || "Montessori & Childcare"} — Cabang ${d.branch_name}${d.branch_city ? ` (${d.branch_city})` : ""}${d.sekolah_alamat ? ` · ${d.sekolah_alamat}` : ""}${d.sekolah_telepon ? ` · ${d.sekolah_telepon}` : ""}`, kiri + geserLogo, y + 21, { width: 330 - geserLogo });
+  }
   doc.fillColor(TINTA).font("Helvetica-Bold").fontSize(15)
     .text("TAGIHAN SPP", kiri, y, { width: lebar, align: "right" });
   doc.fillColor(ABU).font("Helvetica").fontSize(9)
     .text("Terkirim otomatis ke wali", kiri, y + 19, { width: lebar, align: "right" });
-  y += 40;
+  y += d.kop_baris ? 56 : 40;
   doc.save().fillColor(EMAS).rect(kiri, y, lebar, 2.5).fill().restore();
   y += 16;
 
@@ -154,8 +166,9 @@ export async function pdfTagihanBuffer(invoiceId: string): Promise<{ buffer: Buf
   );
   if (!rows[0]) return null;
   const data = rows[0];
-  const { getIdentitas } = await import("../sekolah");
+  const { getIdentitas, kopTigaBaris } = await import("../sekolah");
   const identitas = await getIdentitas();
+  data.kop_baris = kopTigaBaris(identitas);
   data.sekolah_nama = identitas.nama;
   data.sekolah_tagline = identitas.tagline;
   data.sekolah_alamat = identitas.alamat;

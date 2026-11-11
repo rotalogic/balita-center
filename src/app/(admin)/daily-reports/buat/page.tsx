@@ -8,6 +8,7 @@ import { ErrorState, PageHead } from "@/components/chrome";
 import { TimeInput } from "@/components/time-input";
 import { buatPosterVideo, useUpload } from "@/components/upload";
 import { SyaratChecklist, cekSyaratLokal } from "@/components/syarat-checklist";
+import { SEGMEN_ZKC } from "@/lib/segmen";
 
 type Meta = {
   branches: Array<{ id: string; name: string }>;
@@ -20,7 +21,7 @@ type Meta = {
 type Child = { id: string; full_name: string; branch_name: string };
 type GaleriItem = { url: string; media_type: "image" | "video"; mime_type?: string; poster_url?: string };
 type Activity = { title: string; apparatus: string; area: string; rating: string; photo_url: string; activity_time: string; notes: string; work_location: string; work_mode: string; material_id: string; milestone_id: string };
-const emptyActivity: Activity = { title: "", apparatus: "", area: "", rating: "4", photo_url: "", activity_time: "", notes: "", work_location: "", work_mode: "", material_id: "", milestone_id: "" };
+const emptyActivity: Activity = { title: "", apparatus: "", area: "", rating: "", photo_url: "", activity_time: "", notes: "", work_location: "", work_mode: "", material_id: "", milestone_id: "" };
 const AREA_OPSI = [["practical_life", "Practical Life"], ["language", "Language"], ["sensorial", "Sensorial"], ["mathematics", "Mathematics"], ["cultural", "Cultural"], ["observasi", "Observasi"]];
 const LOKASI_OPSI = [["lantai", "Lantai"], ["meja", "Meja"], ["alas", "Alas Kerja"]];
 const MODE_OPSI = [["sendiri", "Sendiri"], ["berpasangan", "Berpasangan"], ["kelompok_kecil", "Kelompok Kecil"], ["kelompok_besar", "Kelompok Besar"]];
@@ -34,6 +35,7 @@ export default function BuatDailyReportPage() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string>>({ report_date: new Date().toISOString().slice(0, 10), meal_level: "banyak", snack_level: "banyak", nap_quality: "baik", mood: "ceria" });
   const [activities, setActivities] = useState<Activity[]>([{ ...emptyActivity }]);
+  const [segmen, setSegmen] = useState<Record<string, string>>({});
   const [gallery, setGallery] = useState<GaleriItem[]>([]);
   const photoUrls = gallery.map((g) => g.url);
   const [result, setResult] = useState<{ ok: boolean; message: string; existingId?: string } | null>(null);
@@ -122,6 +124,11 @@ export default function BuatDailyReportPage() {
               }))
             : [{ ...emptyActivity }]
         );
+        const seg: Record<string, string> = {};
+        for (const s of (d.segments || []) as Array<Record<string, unknown>>) {
+          seg[String(s.segmen)] = String(s.catatan ?? "");
+        }
+        setSegmen(seg);
         const galeri = ((d.photos || []) as Array<Record<string, unknown>>).map((p) => ({
           url: String(p.photo_url ?? ""),
           media_type: (p.media_type === "video" ? "video" : "image") as "image" | "video",
@@ -140,14 +147,14 @@ export default function BuatDailyReportPage() {
     if (!siap) return;
     const timer = setTimeout(() => {
       try {
-        localStorage.setItem(kunciDraf, JSON.stringify({ form, activities, gallery }));
+        localStorage.setItem(kunciDraf, JSON.stringify({ form, activities, gallery, segmen }));
         setSimpanTerakhir(new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }));
       } catch {
         /* kuota penuh: abaikan, jangan ganggu pengisian */
       }
     }, 700);
     return () => clearTimeout(timer);
-  }, [form, activities, gallery, siap, kunciDraf]);
+  }, [form, activities, gallery, segmen, siap, kunciDraf]);
 
   // Pulihkan simpanan lokal setelah data server selesai dimuat.
   useEffect(() => {
@@ -155,8 +162,9 @@ export default function BuatDailyReportPage() {
     try {
       const simpan = localStorage.getItem(kunciDraf);
       if (!simpan) return;
-      const isi = JSON.parse(simpan) as { form?: Record<string, string>; activities?: typeof activities; gallery?: GaleriItem[]; photoUrls?: string[] };
+      const isi = JSON.parse(simpan) as { form?: Record<string, string>; activities?: typeof activities; gallery?: GaleriItem[]; photoUrls?: string[]; segmen?: Record<string, string> };
       if (isi.form) setForm((p) => ({ ...p, ...isi.form }));
+      if (isi.segmen) setSegmen(isi.segmen);
       if (isi.activities?.length) setActivities(isi.activities.map((x) => ({ ...emptyActivity, ...x })));
       if (isi.gallery?.length) setGallery(isi.gallery);
       else if (isi.photoUrls?.length) setGallery(isi.photoUrls.filter(Boolean).map((url) => ({ url, media_type: "image" as const })));
@@ -262,6 +270,7 @@ export default function BuatDailyReportPage() {
       circle_rating: Number(form.circle_rating || 0),
       activities: activities.filter((a) => a.title).map((a) => ({ ...a, rating: Number(a.rating || 0) })),
       photos: gallery.map((g) => ({ photo_url: g.url, media_type: g.media_type, mime_type: g.mime_type, poster_url: g.poster_url })),
+      segmen,
     };
     try {
       const res = reportId
@@ -405,7 +414,7 @@ export default function BuatDailyReportPage() {
                   <div className="field"><label>Judul Aktivitas</label><input placeholder="Mengenal warna dan bentuk" value={a.title} onChange={(e) => setActivity(i, { title: e.target.value })} /></div>
                   <div className="field"><label>Jam</label><TimeInput value={a.activity_time} label={`Jam aktivitas ${i + 1}`} onChange={(v) => setActivity(i, { activity_time: v })} /></div>
                   <div className="field"><label>Aparatus (syarat terbit)</label><input placeholder="Kartu warna Montessori" value={a.apparatus} onChange={(e) => ketikAparatus(i, e.target.value)} /></div>
-                  <div className="field"><label>Rating 1–4 Bintang (syarat terbit)</label><input type="number" min="1" max="4" value={a.rating} onChange={(e) => setActivity(i, { rating: e.target.value })} /></div>
+                  <div className="field"><label>Penilaian Kata (syarat terbit)</label><select value={a.rating} onChange={(e) => setActivity(i, { rating: e.target.value })}><option value="">Belum dinilai</option><option value="1">Belum Mampu</option><option value="2">Mulai Mampu</option><option value="3">Mandiri</option></select></div>
                   <div className="field"><label>Area Montessori</label><select value={a.area} onChange={(e) => gantiArea(i, e.target.value)}><option value="">Pilih area</option>{AREA_OPSI.map(([v, label]) => (<option key={v} value={v}>{label}</option>))}</select></div>
                   <div className="field"><label>Lokasi Kerja</label><select value={a.work_location} onChange={(e) => setActivity(i, { work_location: e.target.value })}><option value="">Pilih lokasi</option>{LOKASI_OPSI.map(([v, label]) => (<option key={v} value={v}>{label}</option>))}</select></div>
                   <div className="field"><label>Mode Kerja</label><select value={a.work_mode} onChange={(e) => setActivity(i, { work_mode: e.target.value })}><option value="">Pilih mode</option>{MODE_OPSI.map(([v, label]) => (<option key={v} value={v}>{label}</option>))}</select></div>
@@ -421,7 +430,7 @@ export default function BuatDailyReportPage() {
                       <option value="">Tidak diamati khusus</option>
                       {milestoneTersedia(a).map((m) => (<option key={m.id} value={m.id}>{m.indikator} · usia {m.age_group}{m.status === "draf" ? " (draf)" : ""}</option>))}
                     </select>
-                    {a.milestone_id ? <small className="muted">Bintang aktivitas ini tercatat sebagai tingkat capaian milestone di riwayat perkembangan anak.</small> : null}
+                    {a.milestone_id ? <small className="muted">Penilaian kata aktivitas ini tercatat sebagai tingkat capaian milestone di riwayat perkembangan anak.</small> : null}
                   </div>
                   <div className="field">
                     <label>Foto Aktivitas</label>
@@ -439,8 +448,29 @@ export default function BuatDailyReportPage() {
             <h2 style={{ marginTop: 22 }}>6. Circle Time</h2>
             <div className="form-grid">
               <div className="field"><label htmlFor="circle_theme">Tema Circle Time</label><input id="circle_theme" placeholder="Profesi dan Cita-cita" value={form.circle_theme || ""} onChange={(e) => set("circle_theme", e.target.value)} /></div>
-              <div className="field"><label htmlFor="circle_rating">Rating Circle Time (1–4)</label><input id="circle_rating" type="number" min="1" max="4" value={form.circle_rating || ""} onChange={(e) => set("circle_rating", e.target.value)} /></div>
+              <div className="field"><label htmlFor="circle_rating">Penilaian Circle Time (kata)</label><select id="circle_rating" value={form.circle_rating || ""} onChange={(e) => set("circle_rating", e.target.value)}><option value="">Belum dinilai</option><option value="1">Belum Mampu</option><option value="2">Mulai Mampu</option><option value="3">Mandiri</option></select></div>
               <div className="field"><label htmlFor="circle_notes">Catatan Circle Time</label><input id="circle_notes" value={form.circle_notes || ""} onChange={(e) => set("circle_notes", e.target.value)} /></div>
+            </div>
+
+            <h2 style={{ marginTop: 22 }}>Segmen Sesi ZKC — 9 Segmen Resmi</h2>
+            <p className="muted" style={{ marginTop: 0 }}>
+              Laporan harian Ziel Kids Club ditulis per sembilan segmen sesi yang berurutan (60 menit reguler,
+              90 menit Kelas Movement). Isi segmen yang dijalani hari ini; segmen kosong tidak tampil di laporan.
+              Untuk anak SAM, isi catatan work cycle lewat Aktivitas &amp; Material di atas.
+            </p>
+            <div className="form-grid">
+              {SEGMEN_ZKC.map((s) => (
+                <div className="field" key={s.kunci}>
+                  <label htmlFor={`seg_${s.kunci}`}>{s.label}</label>
+                  <textarea
+                    id={`seg_${s.kunci}`}
+                    rows={2}
+                    placeholder={s.petunjuk}
+                    value={segmen[s.kunci] || ""}
+                    onChange={(e) => setSegmen((p) => ({ ...p, [s.kunci]: e.target.value }))}
+                  />
+                </div>
+              ))}
             </div>
 
             <h2 style={{ marginTop: 22 }}>7. Moment Special &amp; Saran di Rumah</h2>

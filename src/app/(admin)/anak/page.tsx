@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { EmptyState, ErrorState, LoadingState, PageHead, StatusBadge } from "@/components/chrome";
+import { LencanaKategori, LencanaLabel } from "@/components/lencana-anak";
 
 type Child = {
   id: string;
@@ -13,6 +14,8 @@ type Child = {
   branch_name: string;
   class_name: string | null;
   guardian_name: string | null;
+  kategori_program: string;
+  label_status: string;
 };
 
 const TONES = ["tone-sky", "tone-pink", "tone-sage", "tone-peach", "tone-lavender"];
@@ -36,6 +39,7 @@ export default function AnakPage() {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [kategoriFilter, setKategoriFilter] = useState("");
   const [mode, setMode] = useState<"aktif" | "sampah">("aktif");
   const [sampah, setSampah] = useState<Array<Record<string, unknown>> | null>(null);
   const [sibukPulih, setSibukPulih] = useState("");
@@ -76,7 +80,9 @@ export default function AnakPage() {
     return () => clearTimeout(t);
   }, [q]);
 
-  const shown = children ? children.filter((c) => !statusFilter || c.status === statusFilter) : null;
+  const shown = children
+    ? children.filter((c) => (!statusFilter || c.status === statusFilter) && (!kategoriFilter || c.kategori_program === kategoriFilter))
+    : null;
   const boys = all.filter((c) => c.gender === "laki_laki").length;
   const girls = all.filter((c) => c.gender === "perempuan").length;
   const classCount = new Set(all.map((c) => c.class_name).filter(Boolean)).size;
@@ -103,6 +109,13 @@ export default function AnakPage() {
           {STATUS_FILTERS.map((s) => (
             <button key={s || "semua"} type="button" className={statusFilter === s ? "tab-pill active" : "tab-pill"} onClick={() => setStatusFilter(s)} aria-pressed={statusFilter === s}>
               {s === "" ? "Semua" : s}
+            </button>
+          ))}
+        </div>
+        <div className="tab-row" role="group" aria-label="Filter kategori program">
+          {["", "ZKC", "SAM"].map((k) => (
+            <button key={k || "semua-kat"} type="button" className={kategoriFilter === k ? "tab-pill active" : "tab-pill"} onClick={() => setKategoriFilter(k)} aria-pressed={kategoriFilter === k}>
+              {k === "" ? "Semua Rumah" : k === "ZKC" ? "Ziel Kids Club" : "Sekolah Alam Montessori"}
             </button>
           ))}
         </div>
@@ -150,7 +163,8 @@ export default function AnakPage() {
               {shown.map((child, i) => (
                 <tr key={child.id}>
                   <td><span className={`child-photo ${TONES[i % TONES.length]}`}>{child.full_name.charAt(0)}</span></td>
-                  <td><strong>{child.full_name}</strong><div className="muted">{child.branch_name}</div></td>
+                  <td><strong>{child.full_name}</strong><div className="muted">{child.branch_name}</div>
+                    <div style={{ marginTop: 4, display: "flex", gap: 6 }}><LencanaKategori kategori={child.kategori_program} /><LencanaLabel label={child.label_status} /></div></td>
                   <td>{child.class_name || "-"}</td>
                   <td>{child.birth_date ? new Date(child.birth_date).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "-"}</td>
                   <td>{ageLabel(child.birth_date)}</td>

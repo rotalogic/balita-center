@@ -24,7 +24,7 @@ export async function cekSyaratTerbit(reportId: string): Promise<CekSyarat> {
     [reportId]
   );
   if (!berbintang[0]?.ada) {
-    kurang.push("Belum ada aktivitas dengan rating bintang dan aparatus terisi.");
+    kurang.push("Belum ada aktivitas dengan penilaian kata dan aparatus terisi.");
   }
 
   const foto = await query<{ ada: boolean }>(

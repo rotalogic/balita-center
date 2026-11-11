@@ -5,13 +5,15 @@ import { guard } from "@/lib/current-user";
 export const dynamic = "force-dynamic";
 
 const STAGES = [
-  "lead_masuk",
-  "dihubungi",
-  "trial_terjadwal",
-  "trial_selesai",
-  "diterima",
-  "ditolak",
-  "terdaftar",
+  "inquiry",
+  "formulir_triase",
+  "penjadwalan",
+  "trial_discovery",
+  "wawancara",
+  "sesi_hasil",
+  "registrasi_orientasi",
+  "baseline",
+  "tidak_lanjut",
 ];
 
 // Pindahkan tahap lead, jadwalkan trial, atau simpan catatan.

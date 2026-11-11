@@ -1,12 +1,15 @@
 // Tampilan laporan harian sebagai halaman web, meniru portal lama sekolah:
-// pita tanggal + tombol PDF + pill mood, kartu aktivitas berbintang dengan
-// chip area/lokasi/mode, kartu Makan/Tidur/Toilet, Catatan Tambahan,
+// pita tanggal + tombol PDF + pill mood, kartu aktivitas dengan penilaian
+// kata (Belum Mampu, Mulai Mampu, Mandiri — tanpa bintang) dan chip
+// area/lokasi/mode, kartu Makan/Tidur/Toilet, Catatan Tambahan,
 // Circle Time, Moment Special, Saran di Rumah, dan kaki pelapor.
 // Dipakai bersama oleh Balita Connect (orang tua) dan detail laporan staf
 // supaya bentuk yang dilihat guru sama persis dengan yang diterima orang tua.
 // PDF (src/lib/pdf/laporan.ts) mengikuti susunan dan warna yang sama.
 
 import { MerekSekolah } from "./merek-sekolah";
+import { kataSkor } from "../lib/skala";
+import { SEGMEN_ZKC } from "../lib/segmen";
 
 export type LaporanAktivitas = {
   id?: string;
@@ -103,15 +106,10 @@ function jamTitik(v?: string | null): string {
   return new Intl.DateTimeFormat("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Jakarta" }).format(d).replace(":", ".");
 }
 
-function Bintang({ n, besar = 17 }: { n: number; besar?: number }) {
-  const v = Math.max(0, Math.min(4, Math.round(Number(n) || 0)));
-  return (
-    <span className="lap-bintang" style={{ fontSize: besar }} aria-label={`${v} dari 4 bintang`}>
-      {[1, 2, 3, 4].map((i) => (
-        <span key={i} className={i <= v ? "on" : "off"}>{i <= v ? "★" : "☆"}</span>
-      ))}
-    </span>
-  );
+function ChipKata({ n }: { n: number }) {
+  const kata = kataSkor(n);
+  if (!kata) return null;
+  return <span className="lap-chip kata">{kata}</span>;
 }
 
 function Ikon({ d, size = 18, warna = "currentColor" }: { d: string; size?: number; warna?: string }) {
@@ -159,8 +157,7 @@ function GayaLaporan() {
       .lap-kartu .atas { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
       .lap-kartu .judul { font-size: 17px; font-weight: 700; color: #191d22; }
       .lap-skor { display: flex; align-items: center; gap: 7px; color: #68727d; font-size: 13.5px; white-space: nowrap; }
-      .lap-bintang .on { color: #f5b81d; }
-      .lap-bintang .off { color: #ccd4db; }
+      .lap-chip.kata { background: #eef4ea; color: #3f6212; }
       .lap-chiprow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
       .lap-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 5px 11px; border-radius: 9px; }
       .lap-chip.area { background: #fce9ef; color: #9d2c4a; }
@@ -205,6 +202,7 @@ function GayaLaporan() {
 export function LaporanWeb({
   report,
   activities,
+  segments,
   childName,
   reporterName,
   reporterPhoto,
@@ -213,12 +211,16 @@ export function LaporanWeb({
 }: {
   report: LaporanData;
   activities: LaporanAktivitas[];
+  segments?: Array<{ segmen: string; catatan: string }>;
   childName: string;
   reporterName?: string | null;
   reporterPhoto?: string | null;
   reporterTtd?: string | null;
   pdfUrl?: string | null;
 }) {
+  const segmenTerisi = SEGMEN_ZKC
+    .map((s) => ({ ...s, catatan: (segments || []).find((x) => x.segmen === s.kunci)?.catatan || "" }))
+    .filter((s) => s.catatan.trim());
   const moodLabel = labelMood(report.mood);
   const napTeks = report.nap_start || report.nap_end
     ? `${jamTitik(report.nap_start) || "--.--"}–${jamTitik(report.nap_end) || "--.--"}`
@@ -251,13 +253,27 @@ export function LaporanWeb({
 
       <div className="lap-sampul"><img src="/ilustrasi/sampul-laporan.jpg" alt="Ilustrasi anak bermain material Montessori di kelas" /></div>
 
+      {segmenTerisi.length > 0 ? (
+        <section className="lap-seksi">
+          <h2><Ikon d={JALUR.kalender} size={19} warna="#1d7fa8" /> Jalannya Sesi Hari Ini</h2>
+          <p className="lap-sub">Sembilan segmen sesi Ziel Kids Club, berurutan dari kedatangan sampai doa penutup</p>
+          {segmenTerisi.map((s, i) => (
+            <div className="lap-kartu" key={s.kunci}>
+              <p className="lap-catatan" style={{ marginTop: 0 }}>
+                <strong>{i + 1}. {s.label}</strong> — {s.catatan}
+              </p>
+            </div>
+          ))}
+        </section>
+      ) : null}
+
       <section className="lap-seksi">
         <h2><Ikon d={JALUR.denyut} size={19} warna="#1d7fa8" /> Aktivitas &amp; Pembelajaran</h2>
-        <p className="lap-sub">Skala penilaian: 1–4 bintang (4 = sempurna) <Ikon d={JALUR.info} size={15} warna="#7fa6bd" /></p>
+        <p className="lap-sub">Penilaian memakai kata: Belum Mampu, Mulai Mampu, dan Mandiri <Ikon d={JALUR.info} size={15} warna="#7fa6bd" /></p>
         {activities.length === 0 ? (
           <div className="lap-kartu"><p className="lap-catatan" style={{ marginTop: 0 }}>Belum ada aktivitas tercatat pada laporan ini.</p></div>
         ) : activities.map((a, i) => {
-          const rating = Math.max(0, Math.min(4, Math.round(Number(a.rating) || 0)));
+          const rating = Math.max(0, Math.min(3, Math.round(Number(a.rating) || 0)));
           const area = labelArea(a.area);
           const lokasi = labelLokasi(a.work_location) || a.location || "";
           const mode = labelMode(a.work_mode) || a.companion || "";
@@ -266,7 +282,7 @@ export function LaporanWeb({
               <div className="atas">
                 <span className="judul">{a.title}</span>
                 {rating > 0 ? (
-                  <span className="lap-skor"><Bintang n={rating} /> {rating}/4</span>
+                  <span className="lap-skor"><ChipKata n={rating} /></span>
                 ) : null}
               </div>
               {(area || lokasi || mode) ? (
@@ -319,7 +335,7 @@ export function LaporanWeb({
           <h2 className="biru"><Ikon d={JALUR.orang} size={18} warna="#15608a" /> Circle Time <Ikon d={JALUR.info} size={15} warna="#7fa6bd" /></h2>
           <div className="lap-birumuda">
             {report.circle_theme ? <div className="judul">{report.circle_theme}</div> : null}
-            {circleRating > 0 ? <div style={{ marginTop: 5 }}><Bintang n={circleRating} besar={15} /></div> : null}
+            {circleRating > 0 ? <div style={{ marginTop: 5 }}><ChipKata n={circleRating} /></div> : null}
             {report.circle_notes ? <p>{report.circle_notes}</p> : null}
           </div>
         </section>

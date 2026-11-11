@@ -71,3 +71,46 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: dbErrorMessage(error) }, { status: 503 });
   }
 }
+
+// Tanggapan dan masukan orang tua atas rapor terbit anaknya — menjadi bagian
+// rapor (Modul Rapor). Hanya wali anak itu, hanya rapor berstatus published.
+export async function POST(request: Request) {
+  const denied = await guard("child.view_own");
+  if (denied.error) return denied.error;
+  const user = denied.user;
+  try {
+    const body = (await request.json()) as Record<string, unknown>;
+    const tanggapan = String(body.tanggapan || "").trim();
+    if (tanggapan.length < 3) {
+      return NextResponse.json({ ok: false, error: "Tanggapan terlalu singkat." }, { status: 400 });
+    }
+    const milik = await query<{ id: string }>(
+      `SELECT c.id FROM children c
+         JOIN child_guardians cg ON cg.child_id = c.id
+         JOIN guardians g ON g.id = cg.guardian_id
+        WHERE lower(g.email) = lower($1) AND c.deleted_at IS NULL`,
+      [user.email]
+    );
+    const allowed = milik.map((r) => r.id);
+    const childId = body.child_id ? String(body.child_id) : allowed[0];
+    if (!childId || !allowed.includes(childId)) {
+      return NextResponse.json({ ok: false, error: "Anda tidak berhak menanggapi rapor anak ini." }, { status: 403 });
+    }
+    const target = await query<{ id: string }>(
+      `SELECT cr.id FROM cycle_reports cr JOIN learning_cycles lc ON lc.id = cr.cycle_id
+        WHERE cr.child_id = $1 AND cr.status = 'published'
+        ORDER BY lc.end_date DESC LIMIT 1`,
+      [childId]
+    );
+    if (target.length === 0) {
+      return NextResponse.json({ ok: false, error: "Belum ada rapor terbit untuk ditanggapi." }, { status: 404 });
+    }
+    await query(
+      "UPDATE cycle_reports SET tanggapan_ortu = $2, tanggapan_at = now() WHERE id = $1",
+      [target[0].id, tanggapan]
+    );
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json({ ok: false, error: dbErrorMessage(error) }, { status: 500 });
+  }
+}

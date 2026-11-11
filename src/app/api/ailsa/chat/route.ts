@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     // Catat percakapan simulator sebagai bukti uji (channel terpisah).
     const leadSim = await query<{ id: string }>(
       `INSERT INTO leads (wa_number, source, bot_status, stage)
-       SELECT $1::varchar, 'simulator', 'baru', 'lead_masuk'
+       SELECT $1::varchar, 'simulator', 'baru', 'inquiry'
         WHERE NOT EXISTS (SELECT 1 FROM leads WHERE wa_number = $1::varchar)`,
       [wa]
     ).then(() =>

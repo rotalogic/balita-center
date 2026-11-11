@@ -5,8 +5,55 @@
 // staf dan Balita Connect; PDF (src/lib/pdf/rapor.ts) mengikuti susunan ini.
 // Semua label di sini manusiawi — kode mentah database tidak tampil.
 
-import { NARASI_MONTESSORI, NARASI_STPPA, labelGizi, type AgregatRapor } from "@/lib/rapor-data";
+import {
+  LABEL_TAHAP_INGGRIS, NARASI_ATENSI, NARASI_INGGRIS, NARASI_ISLAM_ARAB,
+  NARASI_MONTESSORI, NARASI_PERKEMBANGAN, NARASI_STPPA, labelGizi, type AgregatRapor,
+} from "@/lib/rapor-data";
 import { MerekSekolah } from "./merek-sekolah";
+
+// Diagram garis pertumbuhan dari titik pengukuran anak itu sendiri — tanpa
+// garis acuan medis dan tanpa bunyi vonis (kaidah Modul Rapor).
+function DiagramGaris({
+  judul, satuan, warna, titik,
+}: {
+  judul: string; satuan: string; warna: string;
+  titik: Array<{ tanggal: string; nilai: number }>;
+}) {
+  if (titik.length === 0) return null;
+  const W = 400, H = 150, PL = 36, PR = 12, PT = 18, PB = 22;
+  const nilai = titik.map((t) => t.nilai);
+  let min = Math.min(...nilai);
+  let max = Math.max(...nilai);
+  if (min === max) { min -= 1; max += 1; }
+  const pad = (max - min) * 0.15;
+  min -= pad;
+  max += pad;
+  const x = (i: number) => PL + (titik.length === 1 ? (W - PL - PR) / 2 : (i * (W - PL - PR)) / (titik.length - 1));
+  const y = (v: number) => PT + (1 - (v - min) / (max - min)) * (H - PT - PB);
+  const garis = titik.map((t, i) => `${x(i)},${y(t.nilai)}`).join(" ");
+  const tgl = (iso: string) =>
+    new Date(`${iso.slice(0, 10)}T00:00:00+07:00`).toLocaleDateString("id-ID", { month: "short", year: "2-digit", timeZone: "Asia/Jakarta" });
+  return (
+    <figure style={{ margin: "12px 0 0" }}>
+      <figcaption style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 4 }}>{judul}</figcaption>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", background: "#fff", border: "1px solid #e3e7ec", borderRadius: 10 }} role="img" aria-label={judul}>
+        <text x={PL} y={11} fontSize={9} fill="#77828e">{max.toFixed(1)} {satuan}</text>
+        <text x={PL} y={H - PB + 2} fontSize={9} fill="#77828e">{min.toFixed(1)} {satuan}</text>
+        {titik.length > 1 ? <polyline points={garis} fill="none" stroke={warna} strokeWidth={2} /> : null}
+        {titik.map((t, i) => (
+          <g key={`${t.tanggal}-${i}`}>
+            <circle cx={x(i)} cy={y(t.nilai)} r={3.5} fill={warna} />
+            <text x={x(i)} y={y(t.nilai) - 7} fontSize={9} textAnchor="middle" fill="#232a31">{t.nilai.toLocaleString("id-ID")}</text>
+          </g>
+        ))}
+        <text x={PL} y={H - 6} fontSize={9} fill="#77828e">{tgl(titik[0].tanggal)}</text>
+        {titik.length > 1 ? (
+          <text x={W - PR} y={H - 6} fontSize={9} textAnchor="end" fill="#77828e">{tgl(titik[titik.length - 1].tanggal)}</text>
+        ) : null}
+      </svg>
+    </figure>
+  );
+}
 
 export type RaporData = Record<string, string | number | null | undefined>;
 
@@ -77,6 +124,17 @@ export function RaporWeb({
 }) {
   const stppa = NARASI_STPPA.filter(([k]) => report[k]);
   const montessori = NARASI_MONTESSORI.filter(([k]) => report[k]);
+  const perkembangan = NARASI_PERKEMBANGAN.filter(([k]) => report[k]);
+  const inggris = NARASI_INGGRIS.filter(([k]) => report[k]);
+  const islamArab = NARASI_ISLAM_ARAB.filter(([k]) => report[k]);
+  const atensi = NARASI_ATENSI.filter(([k]) => report[k]);
+  const tahapInggris = report.inggris_tahap ? Number(report.inggris_tahap) : null;
+  const seriBerat = agregat.pengukuran
+    .filter((p) => p.berat_kg !== null)
+    .map((p) => ({ tanggal: p.tanggal, nilai: p.berat_kg as number }));
+  const seriTinggi = agregat.pengukuran
+    .filter((p) => p.tinggi_cm !== null)
+    .map((p) => ({ tanggal: p.tanggal, nilai: p.tinggi_cm as number }));
   const guru = (report.teacher_name as string) || "Guru kelas";
 
   return (
@@ -99,6 +157,18 @@ export function RaporWeb({
       </header>
 
       <div className="rap-sampul"><img src="/ilustrasi/sampul-rapor.jpg" alt="Ilustrasi guru membacakan buku bersama anak di taman sekolah" /></div>
+
+      {report.ringkasan_ortu || tahapInggris ? (
+        <section className="rap-seksi">
+          <h2>Ringkasan untuk Orang Tua</h2>
+          {report.ringkasan_ortu ? <div className="rap-krem">{String(report.ringkasan_ortu)}</div> : null}
+          {tahapInggris ? (
+            <p style={{ marginTop: 8, fontSize: 14 }}>
+              Bahasa Inggris periode ini: ananda berada pada <strong>{LABEL_TAHAP_INGGRIS[tahapInggris] || `Tahap ${tahapInggris}`}</strong> — rincian pada bagian Bahasa Inggris di bawah.
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       {stppa.length > 0 ? (
         <section className="rap-seksi">
@@ -124,6 +194,74 @@ export function RaporWeb({
         </section>
       ) : null}
 
+      {perkembangan.length > 0 ? (
+        <section className="rap-seksi">
+          <h2>Catatan Perkembangan</h2>
+          {perkembangan.map(([k, label]) => (
+            <article className="rap-kartu" key={k}>
+              <div className="judul">{label}</div>
+              <p>{String(report[k])}</p>
+            </article>
+          ))}
+        </section>
+      ) : null}
+
+      {report.narrative_kelekatan || report.narrative_tema || report.profil_cara_belajar ? (
+        <section className="rap-seksi">
+          <h2>Kelekatan, Tema &amp; Cara Belajar</h2>
+          {report.narrative_kelekatan ? (
+            <article className="rap-kartu"><div className="judul">Keterangan Kelekatan</div><p>{String(report.narrative_kelekatan)}</p></article>
+          ) : null}
+          {report.narrative_tema ? (
+            <article className="rap-kartu"><div className="judul">Observasi dari Tema Mingguan</div><p>{String(report.narrative_tema)}</p></article>
+          ) : null}
+          {report.profil_cara_belajar ? (
+            <article className="rap-kartu"><div className="judul">Profil Cara Belajar</div><p>{String(report.profil_cara_belajar)}</p></article>
+          ) : null}
+        </section>
+      ) : null}
+
+      {inggris.length > 0 || tahapInggris ? (
+        <section className="rap-seksi">
+          <h2>Bahasa Inggris</h2>
+          {tahapInggris ? (
+            <p style={{ marginTop: 8 }}><span className="rap-pil">{LABEL_TAHAP_INGGRIS[tahapInggris] || `Tahap ${tahapInggris}`}</span></p>
+          ) : null}
+          {inggris.map(([k, label]) => (
+            <article className="rap-kartu" key={k}>
+              <div className="judul">{label}</div>
+              <p>{String(report[k])}</p>
+            </article>
+          ))}
+        </section>
+      ) : null}
+
+      {islamArab.length > 0 ? (
+        <section className="rap-seksi">
+          <h2>Kehidupan Islam &amp; Bahasa Arab</h2>
+          {islamArab.map(([k, label]) => (
+            <article className="rap-kartu" key={k}>
+              <div className="judul">{label}</div>
+              <p>{String(report[k])}</p>
+            </article>
+          ))}
+        </section>
+      ) : null}
+
+      {atensi.length > 0 ? (
+        <section className="rap-seksi">
+          <h2>Atensi &amp; Konsentrasi</h2>
+          <article className="rap-panel" style={{ marginTop: 12 }}>
+            {atensi.map(([k, label]) => (
+              <div key={k} style={{ padding: "5px 0" }}>
+                <div style={{ fontWeight: 700, fontSize: 13.5, color: "#7a1f3d" }}>{label}</div>
+                <div style={{ fontSize: 14.5 }}>{String(report[k])}</div>
+              </div>
+            ))}
+          </article>
+        </section>
+      ) : null}
+
       {report.conclusion ? (
         <section className="rap-seksi">
           <h2>Kesimpulan</h2>
@@ -135,6 +273,13 @@ export function RaporWeb({
         <section className="rap-seksi">
           <h2>Saran untuk Orang Tua</h2>
           <div className="rap-krem">{String(report.parent_suggestion)}</div>
+        </section>
+      ) : null}
+
+      {report.tips_pola_asuh ? (
+        <section className="rap-seksi">
+          <h2>Tips Pola Asuh di Rumah</h2>
+          <div className="rap-krem">{String(report.tips_pola_asuh)}</div>
         </section>
       ) : null}
 
@@ -192,6 +337,40 @@ export function RaporWeb({
           </article>
         </div>
       </section>
+
+      <section className="rap-seksi">
+        <h2>Pertumbuhan Fisik</h2>
+        {agregat.pengukuran.length === 0 ? (
+          <article className="rap-kartu">
+            <p style={{ marginTop: 0 }}>
+              Belum ada data pengukuran berat dan tinggi badan ananda sampai akhir periode ini. Bagian ini
+              terisi otomatis dari titik pengukuran anak sendiri sesudah guru atau petugas kesehatan
+              mencatat pengukuran — tanpa garis acuan dan tanpa penilaian medis.
+            </p>
+          </article>
+        ) : (
+          <>
+            <DiagramGaris judul="Berat Badan" satuan="kg" warna="#b3541e" titik={seriBerat} />
+            <DiagramGaris judul="Tinggi Badan" satuan="cm" warna="#4F7A54" titik={seriTinggi} />
+            {agregat.pengukuran.length === 1 ? (
+              <p style={{ fontSize: 13, color: "#77828e" }}>Baru satu titik pengukuran tercatat — garis pertumbuhan tergambar sesudah pengukuran berikutnya.</p>
+            ) : null}
+          </>
+        )}
+        {report.narasi_pertumbuhan ? <div className="rap-krem">{String(report.narasi_pertumbuhan)}</div> : null}
+      </section>
+
+      {report.tanggapan_ortu ? (
+        <section className="rap-seksi">
+          <h2>Tanggapan &amp; Masukan Orang Tua</h2>
+          <div className="rap-krem">
+            {String(report.tanggapan_ortu)}
+            {report.tanggapan_at ? (
+              <div style={{ fontSize: 12.5, color: "#8a94a0", marginTop: 6 }}>Ditulis orang tua pada {formatTanggal(report.tanggapan_at as string)}</div>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
 
       <footer className="rap-kaki">
         {(report as Record<string, unknown>).teacher_photo ? (

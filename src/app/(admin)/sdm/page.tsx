@@ -85,6 +85,16 @@ export default function SdmPage() {
     <>
       <PageHead title="SDM" subtitle="Data staf, kehadiran, cuti, KPI, rekrutmen, dan onboarding" />
       <ApiError error={error || leave.error} />
+      <article className="card">
+        <h2 style={{ marginTop: 0 }}>Perangkat SDM Lembaga</h2>
+        <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+          <a className="btn secondary" href="/sdm/kompetensi">Standar &amp; Kompetensi Guru</a>
+          <a className="btn secondary" href="/sdm/probation">Masa Magang &amp; Probation</a>
+          <a className="btn secondary" href="/sdm/rekrutmen">Rekrutmen Guru</a>
+          <a className="btn secondary" href="/papan-poin">Papan Poin Guru</a>
+          <a className="btn secondary" href="/peraturan">Peraturan &amp; Kesepakatan Bersama</a>
+        </div>
+      </article>
       <KpiGrid items={[
         { label: "Total Staf & Guru", value: data ? data.staff.length : "...", icon: "⚑", tone: "tone-pink" },
         { label: "Cuti Menunggu Keputusan", value: leave.data ? pending : "...", icon: "✎", tone: "tone-peach" },

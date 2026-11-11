@@ -73,7 +73,11 @@ export default function PengaturanPage() {
   );
 }
 
-type Identitas = { nama: string; tagline: string; alamat: string | null; telepon: string | null; email: string | null; logo_url: string | null };
+type Identitas = {
+  nama: string; tagline: string; alamat: string | null; telepon: string | null; email: string | null; logo_url: string | null;
+  nama_yayasan: string; nama_gabungan: string; tagline_gabungan: string;
+  visi: string | null; misi: string | null; motto: string | null; warna_zkc: string; warna_sam: string;
+};
 type BarisStatus = { kunci: string; label: string; ok: boolean; keterangan: string };
 
 function KartuIdentitas() {
@@ -137,6 +141,29 @@ function KartuIdentitas() {
           <input id="id-email" value={form.email || ""} onChange={set("email")} placeholder="halo@sekolah.sch.id" /></div>
         <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="id-alamat">Alamat</label>
           <input id="id-alamat" value={form.alamat || ""} onChange={set("alamat")} placeholder="Jalan, nomor, kota" /></div>
+      </div>
+      <h3 style={{ margin: "18px 0 4px" }}>Kop Resmi Tiga Baris</h3>
+      <p className="muted" style={{ marginTop: 0 }}>
+        Susunan terkunci pada kop sistem, kop laporan, kop surat, dan kepala website:
+        baris yayasan, nama gabungan dua rumah, lalu tagline gabungan dalam satu baris.
+      </p>
+      <div className="form-grid">
+        <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="id-yayasan">Baris 1 — Yayasan</label>
+          <input id="id-yayasan" value={form.nama_yayasan} onChange={set("nama_yayasan")} /></div>
+        <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="id-gabungan">Baris 2 — Nama Gabungan</label>
+          <input id="id-gabungan" value={form.nama_gabungan} onChange={set("nama_gabungan")} /></div>
+        <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="id-tagline-gabungan">Baris 3 — Tagline Gabungan</label>
+          <input id="id-tagline-gabungan" value={form.tagline_gabungan} onChange={set("tagline_gabungan")} /></div>
+        <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="id-visi">Visi Lembaga</label>
+          <textarea id="id-visi" rows={2} value={form.visi || ""} onChange={set("visi")} /></div>
+        <div className="field" style={{ gridColumn: "1 / -1" }}><label htmlFor="id-misi">Misi Lembaga (satu butir per baris)</label>
+          <textarea id="id-misi" rows={3} value={form.misi || ""} onChange={set("misi")} /></div>
+        <div className="field"><label htmlFor="id-motto">Motto Yayasan</label>
+          <input id="id-motto" value={form.motto || ""} onChange={set("motto")} /></div>
+        <div className="field"><label htmlFor="id-warna-zkc">Warna Ziel Kids Club (cokelat natural)</label>
+          <input id="id-warna-zkc" type="color" value={form.warna_zkc || "#8A6844"} onChange={set("warna_zkc")} /></div>
+        <div className="field"><label htmlFor="id-warna-sam">Warna Sekolah Alam Montessori (hijau natural)</label>
+          <input id="id-warna-sam" type="color" value={form.warna_sam || "#4F7A54"} onChange={set("warna_sam")} /></div>
       </div>
       <div className="row" style={{ alignItems: "center", gap: 14, marginTop: 10 }}>
         {form.logo_url ? (

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { EmptyState, ErrorState, LoadingState, PageHead, StatusBadge } from "@/components/chrome";
+import { kataSkor } from "@/lib/skala";
 
 type Report = {
   id: string; report_date: string; status: string; mood: string | null; meal_level: string | null;
@@ -123,15 +124,15 @@ export default function ReviewPage() {
               {detail.activities.length === 0 ? <p className="muted">Tidak ada aktivitas tercatat.</p> : (
                 <ul className="timeline">
                   {detail.activities.map((a) => (
-                    <li key={String(a.id)}><time>{String(a.activity_time || "").slice(0, 5) || "--:--"}</time><div><strong>{String(a.title)}</strong><div className="muted">{String(a.apparatus || "tanpa aparatus")} · rating {String(a.rating || "-")}</div></div></li>
+                    <li key={String(a.id)}><time>{String(a.activity_time || "").slice(0, 5) || "--:--"}</time><div><strong>{String(a.title)}</strong><div className="muted">{String(a.apparatus || "tanpa aparatus")} · penilaian {kataSkor(a.rating) || "belum dinilai"}</div></div></li>
                   ))}
                 </ul>
               )}
               <h3 style={{ marginTop: 12 }}>Syarat Terbit</h3>
               <ul className="checklist">
                 <li><span className={facilitatorOk ? "ok-mark" : "no-mark"}>{facilitatorOk ? "✓" : "✕"}</span> Fasilitator utama {detail.report.facilitator_name ? `(${detail.report.facilitator_name})` : "belum dipilih"}</li>
-                <li><span className={starredOk ? "ok-mark" : "no-mark"}>{starredOk ? "✓" : "✕"}</span> Ada aktivitas berbintang dengan aparatus</li>
-                <li><span className={allStarredOk ? "ok-mark" : "no-mark"}>{allStarredOk ? "✓" : "✕"}</span> Semua aktivitas berbintang punya aparatus</li>
+                <li><span className={starredOk ? "ok-mark" : "no-mark"}>{starredOk ? "✓" : "✕"}</span> Ada aktivitas yang dinilai dengan aparatus</li>
+                <li><span className={allStarredOk ? "ok-mark" : "no-mark"}>{allStarredOk ? "✓" : "✕"}</span> Semua aktivitas yang dinilai punya aparatus</li>
                 <li><span className={photoOk ? "ok-mark" : "no-mark"}>{photoOk ? "✓" : "✕"}</span> Minimal 1 foto dokumentasi ({detail.photos.length} foto galeri)</li>
               </ul>
               <div className="field">

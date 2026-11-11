@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { dbErrorMessage, query } from "@/lib/db";
 import { guard } from "@/lib/current-user";
 import { catatAudit } from "@/lib/audit";
+import { PESAN_SKEMA_RANCANGAN, programRancanganDiCabang, skemaRancanganAnak } from "@/lib/skema-server";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,13 @@ export async function POST(request: Request) {
     const body = (await request.json()) as Record<string, string>;
     if (body.action === "spp_massal") {
       if (!body.branch_id) return NextResponse.json({ ok: false, error: "Cabang wajib dipilih." }, { status: 400 });
+      const programRancangan = await programRancanganDiCabang(body.branch_id);
+      if (programRancangan.length > 0) {
+        return NextResponse.json(
+          { ok: false, error: `Tagihan massal ditolak: program ${programRancangan.join(", ")} memakai skema biaya berstatus Rancangan. Skema Rancangan terkunci dari pembuatan invoice sampai founder menjadikannya Final.` },
+          { status: 400 }
+        );
+      }
       const period = body.period_month || new Date().toISOString().slice(0, 7) + "-01";
       const created = await query<{ child_name: string }>(
         `INSERT INTO invoices (branch_id, child_id, period_month, description, amount, status, due_date)
@@ -92,6 +100,10 @@ export async function POST(request: Request) {
         );
       }
 
+      const skemaRancangan = await skemaRancanganAnak(body.child_id);
+      if (skemaRancangan) {
+        return NextResponse.json({ ok: false, error: PESAN_SKEMA_RANCANGAN(skemaRancangan) }, { status: 400 });
+      }
       const tarif = await query<{ monthly_fee: string | null; program_name: string }>(
         `SELECT p.monthly_fee, p.name AS program_name
            FROM enrollments e JOIN programs p ON p.id = e.program_id
@@ -150,6 +162,13 @@ export async function POST(request: Request) {
         [body.invoice_id]
       );
       if (inv.length === 0) return NextResponse.json({ ok: false, error: "Tagihan tidak ditemukan." }, { status: 404 });
+      const skemaBayar = await skemaRancanganAnak(inv[0].child_id);
+      if (skemaBayar) {
+        return NextResponse.json(
+          { ok: false, error: `Pembayaran ditolak: ${PESAN_SKEMA_RANCANGAN(skemaBayar)}` },
+          { status: 400 }
+        );
+      }
       const amount = Number(body.amount || inv[0].amount);
       const cash = await query<{ id: string }>(
         `INSERT INTO cash_book_entries (branch_id, entry_date, direction, category, description, amount, source_type, source_id, created_by)

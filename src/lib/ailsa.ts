@@ -41,7 +41,7 @@ async function leadByWa(wa: string): Promise<Lead | null> {
 async function leadBaru(wa: string): Promise<Lead> {
   const rows = await query<Lead>(
     `INSERT INTO leads (wa_number, source, bot_status, stage)
-     VALUES ($1, 'whatsapp_ailsa', 'baru', 'lead_masuk')
+     VALUES ($1, 'whatsapp_ailsa', 'baru', 'inquiry')
      RETURNING id, parent_name, child_name, child_age_months, branch_id, interested_program_id, stage, bot_status, source`,
     [wa]
   );

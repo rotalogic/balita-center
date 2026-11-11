@@ -42,6 +42,16 @@ psql "$DATABASE_URL" -f database/migrasi-identitas.sql
 psql "$DATABASE_URL" -f database/migrasi-gateway-order.sql
 psql "$DATABASE_URL" -f database/migrasi-status-tagihan.sql
 psql "$DATABASE_URL" -f database/migrasi-pengguna-login.sql
+psql "$DATABASE_URL" -f database/migrasi-zkc-tahap1.sql
+psql "$DATABASE_URL" -f database/migrasi-zkc-tahap3-penerimaan.sql
+psql "$DATABASE_URL" -f database/migrasi-zkc-tahap3-insidentil.sql
+psql "$DATABASE_URL" -f database/migrasi-zkc-tahap3-laporan.sql
+psql "$DATABASE_URL" -f database/migrasi-zkc-tahap3-rapor.sql
+psql "$DATABASE_URL" -f database/migrasi-zkc-tahap3-event.sql
+psql "$DATABASE_URL" -f database/migrasi-zkc-tahap3-skrining.sql
+psql "$DATABASE_URL" -f database/migrasi-zkc-tahap3-minat.sql
+psql "$DATABASE_URL" -f database/migrasi-zkc-tahap4.sql
+psql "$DATABASE_URL" -f database/migrasi-zkc-tahap5.sql
 ```
 
 Semua migrasi memakai `IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`,

@@ -1,6 +1,8 @@
 import { query } from "@/lib/db";
 import { currentUser, hasPermission } from "@/lib/current-user";
 import { tanggalPanjang, jamRapi } from "@/lib/format";
+import { kataSkor } from "@/lib/skala";
+import { SEGMEN_ZKC } from "@/lib/segmen";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +20,7 @@ const MOOD: Record<string, string> = { ceria: "Ceria", tenang: "Tenang", aktif: 
 const MAKAN: Record<string, string> = { habis: "habis", sebagian: "sebagian", sedikit: "sedikit", tidak_makan: "tidak makan" };
 const TIDUR: Record<string, string> = { nyenyak: "nyenyak", gelisah: "gelisah", tidak_tidur: "tidak tidur" };
 
-const bintang = (n: number) => `${"★".repeat(Math.max(0, Math.min(5, n))) }${"☆".repeat(5 - Math.max(0, Math.min(5, n)))}`;
+const kata = (n: number) => kataSkor(n);
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   const user = await currentUser();
@@ -55,7 +57,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   }
   if (!boleh) return new Response("Anda tidak berhak mengunduh laporan ini.", { status: 403 });
 
-  const [aktivitas, foto, aspek] = await Promise.all([
+  const [aktivitas, foto, aspek, segmenRows] = await Promise.all([
     query<{ activity_time: string | null; title: string; apparatus: string | null; rating: string | null }>(
       `SELECT activity_time, title, apparatus, rating FROM daily_report_activities
         WHERE report_id = $1::uuid ORDER BY sort_order, activity_time NULLS LAST`,
@@ -73,7 +75,14 @@ export async function GET(_request: Request, { params }: { params: { id: string 
         ORDER BY si.aspect`,
       [r.child_id, String(r.report_date)]
     ),
+    query<{ segmen: string; catatan: string }>(
+      "SELECT segmen, catatan FROM daily_report_segments WHERE report_id = $1::uuid",
+      [params.id]
+    ),
   ]);
+  const segmenHtml = SEGMEN_ZKC
+    .map((s) => ({ label: s.label, catatan: segmenRows.find((x) => x.segmen === s.kunci)?.catatan || "" }))
+    .filter((s) => s.catatan.trim());
 
   const makan = [r.meals_text, r.meal_level ? MAKAN[String(r.meal_level)] || r.meal_level : null].filter(Boolean).join(" — ");
   const snack = [r.snack_text, r.snack_level ? MAKAN[String(r.snack_level)] || r.snack_level : null].filter(Boolean).join(" — ");
@@ -130,11 +139,15 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       <div><span>Guru Kelas</span><strong>${esc(r.teacher || "—")}</strong></div>
     </div>
 
+    ${segmenHtml.length ? `<h3>Jalannya Sesi Hari Ini</h3><ul>
+      ${segmenHtml.map((s, i) => `<li><strong>${i + 1}. ${esc(s.label)}</strong> — ${esc(s.catatan)}</li>`).join("")}
+    </ul>` : ""}
+
     ${aktivitas.length ? `<h3>Aktivitas Hari Ini</h3>
     <table><thead><tr><th style="width:70px">Waktu</th><th>Aktivitas</th><th>Aparatus</th><th class="kanan">Penilaian</th></tr></thead><tbody>
       ${aktivitas.map((a) => `<tr><td>${a.activity_time ? jamRapi(String(a.activity_time)) : "—"}</td>
         <td>${esc(a.title)}</td><td>${esc(a.apparatus || "—")}</td>
-        <td class="kanan">${bintang(Number(a.rating || 0))}</td></tr>`).join("")}
+        <td class="kanan">${kata(Number(a.rating || 0))}</td></tr>`).join("")}
     </tbody></table>` : ""}
 
     ${aspek.length ? `<h3>Aspek Perkembangan yang Teramati (STPPA)</h3><ul>

@@ -56,7 +56,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       blood_type: "blood_type", status: "status", health_notes: "health_notes",
       special_needs: "special_needs", languages: "languages", hobbies: "hobbies",
       transport_mode: "transport_mode", photo_url: "photo_url",
+      kategori_program: "kategori_program", label_status: "label_status",
     };
+    if ("kategori_program" in body && !["ZKC", "SAM"].includes(body.kategori_program)) {
+      return NextResponse.json({ ok: false, error: "Kategori program harus ZKC atau SAM." }, { status: 400 });
+    }
+    if ("label_status" in body && !["Anggota", "Trial", "Insidentil", "Peserta Event", "Klien Skrining", "Klien Konsultasi"].includes(body.label_status)) {
+      return NextResponse.json({ ok: false, error: "Label status anak tidak dikenal." }, { status: 400 });
+    }
     const set: string[] = [];
     const nilai: unknown[] = [];
     const perubahan: Record<string, { dari: unknown; ke: unknown }> = {};

@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ErrorState, LoadingState, PageHead, StatusBadge } from "@/components/chrome";
-import { KOLOM_NARASI, NARASI_MONTESSORI, NARASI_STPPA } from "@/lib/rapor-data";
+import {
+  KOLOM_NARASI, NARASI_ATENSI, NARASI_INGGRIS, NARASI_ISLAM_ARAB,
+  NARASI_MONTESSORI, NARASI_PERKEMBANGAN, NARASI_STPPA,
+} from "@/lib/rapor-data";
 import { useUpload } from "@/components/upload";
 
 const LABEL_TAMBAHAN: Record<string, string> = {
@@ -30,6 +33,7 @@ export default function RaporEditPage({ params }: { params: { id: string } }) {
         const r = d.report as Record<string, unknown>;
         const awal: Record<string, string> = {};
         for (const k of KOLOM_NARASI) awal[k] = String(r[k] ?? "");
+        awal["inggris_tahap"] = String(r.inggris_tahap ?? "");
         setForm(awal);
         const foto = ((d.photos || []) as Array<Record<string, unknown>>).map((p) => ({
           photo_url: String(p.photo_url ?? ""),
@@ -45,7 +49,7 @@ export default function RaporEditPage({ params }: { params: { id: string } }) {
 
   const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
 
-  async function simpan(terbitkan: boolean) {
+  async function simpan() {
     setBusy(true);
     setError(null);
     setInfo(null);
@@ -53,30 +57,18 @@ export default function RaporEditPage({ params }: { params: { id: string } }) {
       method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, photos }),
     });
     const d = await res.json();
+    setBusy(false);
     if (!d.ok) {
-      setBusy(false);
       setError(d.error || "Gagal menyimpan rapor.");
       return;
     }
-    if (terbitkan) {
-      const res2 = await fetch(`/api/rapor/${params.id}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ publish: true }),
-      });
-      const d2 = await res2.json();
-      setBusy(false);
-      if (!d2.ok) { setError(d2.error || "Narasi tersimpan, tapi penerbitan gagal."); return; }
-      setStatus("published");
-      setInfo("Rapor tersimpan dan diterbitkan — sekarang tampil untuk orang tua di Balita Connect.");
-      return;
-    }
-    setBusy(false);
-    setInfo("Narasi rapor tersimpan sebagai draft.");
+    setInfo("Narasi rapor tersimpan sebagai Draf Guru. Alur terbit 4 tahap (Diperiksa Manager → Disetujui Founder → Terbit) dijalankan dari halaman Lihat Rapor.");
   }
 
   if (!siap) return (<><PageHead title="Edit Rapor" /><LoadingState /></>);
   if (error && !judul) return (<><PageHead title="Edit Rapor" /><ErrorState message={error} /></>);
 
-  const terkunci = status === "published";
+  const terkunci = status !== "draft";
 
   const grup = (judulGrup: string, daftar: Array<[string, string]>) => (
     <>
@@ -103,12 +95,37 @@ export default function RaporEditPage({ params }: { params: { id: string } }) {
       {info ? <p className="success" role="status">{info}</p> : null}
       {error ? <ErrorState message={error} /> : null}
       {terkunci ? (
-        <p className="notice" role="status">Rapor ini sudah terbit dan terkunci. Tarik dulu ke draft dari halaman Lihat Rapor bila ingin mengubah narasi.</p>
+        <p className="notice" role="status">Narasi hanya bisa diubah pada tahap Draf Guru. Kembalikan dulu rapor ke draf dari halaman Lihat Rapor bila ingin mengubah narasi.</p>
       ) : null}
       <div className="card">
+        {grup("Ringkasan untuk Orang Tua (satu halaman, bahasa sehari-hari)", [["ringkasan_ortu", "Ringkasan Pembuka"]])}
         {grup("Aspek Perkembangan (STPPA)", NARASI_STPPA)}
         {grup("Area Montessori", NARASI_MONTESSORI)}
-        {grup("Penutup", [["conclusion", LABEL_TAMBAHAN.conclusion], ["parent_suggestion", LABEL_TAMBAHAN.parent_suggestion]])}
+        {grup("Catatan Perkembangan (urutan resmi)", NARASI_PERKEMBANGAN)}
+        {grup("Kelekatan, Tema & Cara Belajar", [
+          ["narrative_kelekatan", "Keterangan Kelekatan"],
+          ["narrative_tema", "Observasi dari Tema Mingguan"],
+          ["profil_cara_belajar", "Profil Cara Belajar"],
+        ])}
+        {grup("Bahasa Inggris (Ziel Kids Club)", NARASI_INGGRIS)}
+        <div className="field" style={{ marginTop: 10 }}>
+          <label htmlFor="f-inggris_tahap">Posisi Anak pada Tahap Pengamatan Bahasa Inggris</label>
+          <select id="f-inggris_tahap" value={form.inggris_tahap || ""} disabled={terkunci}
+            onChange={(e) => set("inggris_tahap", e.target.value)}>
+            <option value="">Belum diamati</option>
+            <option value="1">Tahap Pengamatan 1</option>
+            <option value="2">Tahap Pengamatan 2</option>
+            <option value="3">Tahap Pengamatan 3</option>
+          </select>
+        </div>
+        {grup("Kehidupan Islam & Bahasa Arab (Sekolah Alam Montessori)", NARASI_ISLAM_ARAB)}
+        {grup("Atensi & Konsentrasi", NARASI_ATENSI)}
+        {grup("Pertumbuhan Fisik", [["narasi_pertumbuhan", "Narasi Pembacaan Arah Pertumbuhan"]])}
+        {grup("Penutup", [
+          ["conclusion", LABEL_TAMBAHAN.conclusion],
+          ["parent_suggestion", LABEL_TAMBAHAN.parent_suggestion],
+          ["tips_pola_asuh", "Tips Pola Asuh di Rumah"],
+        ])}
 
         <h2 style={{ marginTop: 24 }}>Dokumentasi Tambahan</h2>
         <p className="muted" style={{ fontSize: 13 }}>
@@ -152,8 +169,7 @@ export default function RaporEditPage({ params }: { params: { id: string } }) {
 
         <div className="row" style={{ marginTop: 20 }}>
           <Link className="btn secondary" href="/rapor">Batal</Link>
-          <button type="button" className="btn secondary" disabled={busy || terkunci} onClick={() => simpan(false)}>{busy ? "Menyimpan…" : "Simpan Draft"}</button>
-          <button type="button" className="btn" disabled={busy || terkunci} onClick={() => simpan(true)}>{busy ? "Menyimpan…" : "Simpan & Terbitkan"}</button>
+          <button type="button" className="btn" disabled={busy || terkunci} onClick={() => void simpan()}>{busy ? "Menyimpan…" : "Simpan Draft"}</button>
         </div>
       </div>
     </>

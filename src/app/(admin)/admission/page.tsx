@@ -29,23 +29,29 @@ type Data = {
 };
 
 const STAGES: Array<[string, string]> = [
-  ["lead_masuk", "Lead Masuk"],
-  ["dihubungi", "Dihubungi"],
-  ["trial_terjadwal", "Trial Terjadwal"],
-  ["trial_selesai", "Trial Selesai"],
-  ["diterima", "Diterima"],
-  ["ditolak", "Ditolak"],
-  ["terdaftar", "Terdaftar"],
+  ["inquiry", "1 · Inquiry"],
+  ["formulir_triase", "2 · Formulir & Triase"],
+  ["penjadwalan", "3 · Penjadwalan"],
+  ["trial_discovery", "4 · Trial / Discovery"],
+  ["wawancara", "5 · Wawancara Orang Tua"],
+  ["sesi_hasil", "6 · Sesi Hasil"],
+  ["registrasi_orientasi", "7 · Registrasi & Orientasi"],
+  ["baseline", "8 · Baseline Berjalan"],
+  ["tidak_lanjut", "Tidak Lanjut"],
 ];
 
+const LABEL_TAHAP: Record<string, string> = Object.fromEntries(STAGES);
+
 const STATUS_CLASS: Record<string, string> = {
-  lead_masuk: "badge neutral",
-  dihubungi: "badge warn",
-  trial_terjadwal: "badge warn",
-  trial_selesai: "badge warn",
-  diterima: "badge ok",
-  ditolak: "badge danger",
-  terdaftar: "badge ok",
+  inquiry: "badge neutral",
+  formulir_triase: "badge warn",
+  penjadwalan: "badge warn",
+  trial_discovery: "badge warn",
+  wawancara: "badge warn",
+  sesi_hasil: "badge ok",
+  registrasi_orientasi: "badge ok",
+  baseline: "badge ok",
+  tidak_lanjut: "badge danger",
 };
 
 export default function AdmissionPage() {
@@ -118,9 +124,14 @@ export default function AdmissionPage() {
     <>
       <PageHead
         title="Admission"
-        subtitle="Pipeline pendaftaran: dari lead masuk sampai terdaftar sebagai anak didik"
+        subtitle="Penerimaan 8 tahap: inquiry, formulir & triase, penjadwalan, trial/Discovery, wawancara, sesi hasil, registrasi & orientasi, baseline berjalan"
         action={<span className="muted">{data.leads.length} lead</span>}
       />
+      <div className="row" style={{ gap: 8, marginBottom: 12 }}>
+        <Link className="btn secondary" href="/admission/trial">Formulir Trial & Filter Arah</Link>
+        <Link className="btn secondary" href="/admission/insidentil">Formulir Insidentil</Link>
+        <Link className="btn secondary" href="/admission/jadwal">Jadwal Sesi & Kuota</Link>
+      </div>
       {error ? <ErrorState message={error} /> : null}
       {info ? <p className="success" role="status">{info}</p> : null}
 
@@ -181,7 +192,7 @@ export default function AdmissionPage() {
                   <td className="mono">{lead.wa_number}</td>
                   <td>{lead.program_name || "-"}</td>
                   <td>
-                    <span className={STATUS_CLASS[lead.stage] || "badge neutral"}>{lead.stage.replace(/_/g, " ")}</span>
+                    <span className={STATUS_CLASS[lead.stage] || "badge neutral"}>{LABEL_TAHAP[lead.stage] || lead.stage}</span>
                     {lead.trial_at ? <div className="muted">{tanggalPendek(lead.trial_at)}</div> : null}
                   </td>
                   <td>
@@ -194,7 +205,7 @@ export default function AdmissionPage() {
                       >
                         {STAGES.map(([code, label]) => (<option key={code} value={code}>{label}</option>))}
                       </select>
-                      {lead.stage === "trial_terjadwal" ? (
+                      {lead.stage === "penjadwalan" ? (
                         <input
                           type="date"
                           aria-label="Tanggal trial"
@@ -203,7 +214,7 @@ export default function AdmissionPage() {
                           onChange={(e) => ubahTahap(lead.id, { trial_at: e.target.value || null }, `Jadwal trial ${lead.child_name} disimpan.`)}
                         />
                       ) : null}
-                      {lead.stage === "diterima" && !lead.converted_child_id ? (
+                      {(lead.stage === "sesi_hasil" || lead.stage === "registrasi_orientasi") && !lead.converted_child_id ? (
                         <Link className="btn small" href={`/anak/tambah?lead=${lead.id}`}>Ubah jadi Anak Didik</Link>
                       ) : null}
                       {lead.converted_child_id ? (

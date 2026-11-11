@@ -47,7 +47,18 @@ type Body = {
   alamat?: string;
   telepon?: string;
   email?: string;
+  nama_yayasan?: string;
+  nama_gabungan?: string;
+  tagline_gabungan?: string;
+  visi?: string;
+  misi?: string;
+  motto?: string;
+  warna_zkc?: string;
+  warna_sam?: string;
 };
+
+const warnaSah = (v: string | undefined, bawaan: string) =>
+  v && /^#[0-9a-fA-F]{6}$/.test(v.trim()) ? v.trim() : bawaan;
 
 export async function POST(request: Request) {
   const denied = await guard("settings.manage");
@@ -63,12 +74,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Format email sekolah tidak benar." }, { status: 400 });
     }
     await query(
-      `INSERT INTO school_settings (id, nama, tagline, alamat, telepon, email, updated_at)
-       VALUES (1, $1, $2, $3, $4, $5, now())
+      `INSERT INTO school_settings (id, nama, tagline, alamat, telepon, email,
+          nama_yayasan, nama_gabungan, tagline_gabungan, visi, misi, motto, warna_zkc, warna_sam, updated_at)
+       VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now())
        ON CONFLICT (id) DO UPDATE SET nama = EXCLUDED.nama, tagline = EXCLUDED.tagline,
-         alamat = EXCLUDED.alamat, telepon = EXCLUDED.telepon, email = EXCLUDED.email, updated_at = now()`,
+         alamat = EXCLUDED.alamat, telepon = EXCLUDED.telepon, email = EXCLUDED.email,
+         nama_yayasan = EXCLUDED.nama_yayasan, nama_gabungan = EXCLUDED.nama_gabungan,
+         tagline_gabungan = EXCLUDED.tagline_gabungan, visi = EXCLUDED.visi, misi = EXCLUDED.misi,
+         motto = EXCLUDED.motto, warna_zkc = EXCLUDED.warna_zkc, warna_sam = EXCLUDED.warna_sam,
+         updated_at = now()`,
       [nama, (body.tagline || "").trim() || "Montessori & Childcare", (body.alamat || "").trim() || null,
-       (body.telepon || "").trim() || null, email || null]
+       (body.telepon || "").trim() || null, email || null,
+       (body.nama_yayasan || "").trim() || "Yayasan Tunas Pelita Cakrawala Insani",
+       (body.nama_gabungan || "").trim() || "Ziel Kids Club & Sekolah Alam Montessori",
+       (body.tagline_gabungan || "").trim() || "Understanding Children. Strengthening Families. Learning Naturally. Growing Meaningfully.",
+       (body.visi || "").trim() || null, (body.misi || "").trim() || null, (body.motto || "").trim() || null,
+       warnaSah(body.warna_zkc, "#8A6844"), warnaSah(body.warna_sam, "#4F7A54")]
     );
     await getIdentitas(true);
     await catatAudit(denied.user, {

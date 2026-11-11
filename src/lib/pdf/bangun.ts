@@ -4,7 +4,7 @@ import { PDFDocument } from "pdf-lib";
 import { query } from "../db";
 import { buatPdfLaporan } from "./laporan";
 import { buatPdfRapor } from "./rapor";
-import { getIdentitas, kopLengkap } from "../sekolah";
+import { getIdentitas, kopLengkap, kopTigaBaris } from "../sekolah";
 import { KOLOM_NARASI, agregatRapor } from "../rapor";
 
 // Pembangun berkas PDF laporan & rapor yang dipakai route unduhan tunggal
@@ -46,6 +46,10 @@ export async function bangunPdfLaporan(r: BarisLaporan, reportId: string, asal: 
       ORDER BY sort_order, activity_time NULLS LAST`,
     [reportId]
   );
+  const segmen = await query<{ segmen: string; catatan: string }>(
+    "SELECT segmen, catatan FROM daily_report_segments WHERE report_id = $1::uuid",
+    [reportId]
+  );
   const fotoBuffers = await Promise.all(aktivitas.map((a) => muatBerkas(a.photo_url, asal, cookie)));
   const banner = await readFile(path.join(process.cwd(), "public/ilustrasi/sampul-laporan.jpg")).catch(() => null);
   const identitas = await getIdentitas();
@@ -85,11 +89,13 @@ export async function bangunPdfLaporan(r: BarisLaporan, reportId: string, asal: 
       work_location: a.work_location,
       work_mode: a.work_mode,
     })),
+    segments: segmen,
     photos: fotoBuffers,
     banner,
     ttd,
     logo,
     sekolah_kop: kopLengkap(identitas),
+    kop_baris: kopTigaBaris(identitas),
   });
   return kumpulkan(doc);
 }
@@ -120,9 +126,12 @@ export async function bangunPdfRapor(r: BarisRapor, reportId: string, asal: stri
     teacher: r.teacher_name ? String(r.teacher_name) : null,
     status: String(r.status),
     narratives,
+    inggris_tahap: r.inggris_tahap ? Number(r.inggris_tahap) : null,
+    tanggapan_ortu: r.tanggapan_ortu ? String(r.tanggapan_ortu) : null,
     agregat,
     photos: fotoBuffers,
     sekolah_kop: kopLengkap(identitas),
+    kop_baris: kopTigaBaris(identitas),
     banner,
     ilustrasi,
     ttd,

@@ -1,5 +1,8 @@
 import PDFDocument from "pdfkit";
-import { NARASI_MONTESSORI, NARASI_STPPA, labelGizi, type AgregatRapor } from "../rapor-data";
+import {
+  LABEL_TAHAP_INGGRIS, NARASI_ATENSI, NARASI_INGGRIS, NARASI_ISLAM_ARAB,
+  NARASI_MONTESSORI, NARASI_PERKEMBANGAN, NARASI_STPPA, labelGizi, type AgregatRapor,
+} from "../rapor-data";
 
 // PDF rapor periodik: susunan mengikuti halaman web rapor
 // (components/rapor-web.tsx) dan rapor portal lama — judul bagian marun,
@@ -10,9 +13,12 @@ type Data = {
   cycle_theme: string; cycle_start: string; cycle_end: string;
   teacher: string | null; status: string;
   narratives: Record<string, string | null>;
+  inggris_tahap?: number | null;
+  tanggapan_ortu?: string | null;
   agregat: AgregatRapor;
   photos?: Array<Buffer | null>; // sejajar agregat.foto
   sekolah_kop?: string; // baris kop dari identitas sekolah, mis. "BALITA CENTER — MONTESSORI & CHILDCARE"
+  kop_baris?: [string, string, string]; // kop resmi tiga baris (yayasan, nama gabungan, tagline gabungan)
   logo?: Buffer | null; // logo sekolah dari identitas (digambar di kepala dokumen)
   pratinjau?: boolean; // true untuk draf: pita penanda DRAF digambar mencolok
   ttd?: Buffer | null; // tanda tangan digital guru pembuat rapor
@@ -106,8 +112,15 @@ export function buatPdfRapor(d: Data): PDFKit.PDFDocument {
       geserLogo = 116;
     } catch { /* logo gagal dimuat — kop teks tetap tampil */ }
   }
-  doc.font("Helvetica-Bold").fontSize(9).fillColor(ABU).text((d.sekolah_kop || "BALITA CENTER — MONTESSORI & CHILDCARE").toUpperCase(), kiri + geserLogo, y, { width: lebar - geserLogo, characterSpacing: 1 });
-  y += 14;
+  if (d.kop_baris) {
+    doc.font("Helvetica-Bold").fontSize(7.5).fillColor(ABU).text(d.kop_baris[0].toUpperCase(), kiri + geserLogo, y, { width: lebar - geserLogo, characterSpacing: 1 });
+    doc.font("Helvetica-Bold").fontSize(11).fillColor(GELAP).text(d.kop_baris[1], kiri + geserLogo, y + 10, { width: lebar - geserLogo });
+    doc.font("Helvetica").fontSize(7.5).fillColor(ABU).text(d.kop_baris[2], kiri + geserLogo, y + 25, { width: lebar - geserLogo });
+    y += 38;
+  } else {
+    doc.font("Helvetica-Bold").fontSize(9).fillColor(ABU).text((d.sekolah_kop || "BALITA CENTER — MONTESSORI & CHILDCARE").toUpperCase(), kiri + geserLogo, y, { width: lebar - geserLogo, characterSpacing: 1 });
+    y += 14;
+  }
   doc.font("Helvetica-Bold").fontSize(19).fillColor(GELAP).text("Rapor Perkembangan", kiri + geserLogo, y, { width: lebar - geserLogo });
   y += 24;
   const barisIdent: Array<[string, string]> = [
@@ -150,6 +163,13 @@ export function buatPdfRapor(d: Data): PDFKit.PDFDocument {
   }
 
   // ---------- Narasi ----------
+  // ---------- Ringkasan pembuka ----------
+  if (d.narratives.ringkasan_ortu) {
+    judulSeksi("Ringkasan untuk Orang Tua");
+    kotakKrem(String(d.narratives.ringkasan_ortu));
+    y += 6;
+  }
+
   const stppa = NARASI_STPPA.filter(([k]) => d.narratives[k]);
   if (stppa.length) {
     judulSeksi("Aspek Perkembangan (STPPA)");
@@ -160,8 +180,46 @@ export function buatPdfRapor(d: Data): PDFKit.PDFDocument {
     judulSeksi("Area Montessori");
     for (const [k, label] of montessori) kartuNarasi(label, String(d.narratives[k]));
   }
+  const perkembanganPdf = NARASI_PERKEMBANGAN.filter(([k]) => d.narratives[k]);
+  if (perkembanganPdf.length) {
+    judulSeksi("Catatan Perkembangan");
+    for (const [k, label] of perkembanganPdf) kartuNarasi(label, String(d.narratives[k]));
+  }
+  const ekstraPdf: Array<[string, string]> = [
+    ["narrative_kelekatan", "Keterangan Kelekatan"],
+    ["narrative_tema", "Observasi dari Tema Mingguan"],
+    ["profil_cara_belajar", "Profil Cara Belajar"],
+  ];
+  const ekstraIsi = ekstraPdf.filter(([k]) => d.narratives[k]);
+  if (ekstraIsi.length) {
+    judulSeksi("Kelekatan, Tema & Cara Belajar");
+    for (const [k, label] of ekstraIsi) kartuNarasi(label, String(d.narratives[k]));
+  }
+  const inggrisPdf = NARASI_INGGRIS.filter(([k]) => d.narratives[k]);
+  if (inggrisPdf.length || d.inggris_tahap) {
+    judulSeksi("Bahasa Inggris");
+    if (d.inggris_tahap) {
+      pastikan(16);
+      doc.font("Helvetica-Bold").fontSize(10).fillColor(GELAP)
+        .text(`Posisi anak: ${LABEL_TAHAP_INGGRIS[d.inggris_tahap] || `Tahap ${d.inggris_tahap}`}`, kiri, y, { width: lebar });
+      y += 16;
+    }
+    for (const [k, label] of inggrisPdf) kartuNarasi(label, String(d.narratives[k]));
+  }
+  const islamPdf = NARASI_ISLAM_ARAB.filter(([k]) => d.narratives[k]);
+  if (islamPdf.length) {
+    judulSeksi("Kehidupan Islam & Bahasa Arab");
+    for (const [k, label] of islamPdf) kartuNarasi(label, String(d.narratives[k]));
+  }
+  const atensiPdf = NARASI_ATENSI.filter(([k]) => d.narratives[k]);
+  if (atensiPdf.length) {
+    judulSeksi("Atensi & Konsentrasi");
+    for (const [k, label] of atensiPdf) kartuNarasi(label, String(d.narratives[k]));
+  }
+
   if (d.narratives.conclusion) { judulSeksi("Kesimpulan"); kotakKrem(String(d.narratives.conclusion)); }
   if (d.narratives.parent_suggestion) { judulSeksi("Saran untuk Orang Tua"); kotakKrem(String(d.narratives.parent_suggestion)); }
+  if (d.narratives.tips_pola_asuh) { judulSeksi("Tips Pola Asuh di Rumah"); kotakKrem(String(d.narratives.tips_pola_asuh)); }
 
   // ---------- Dokumentasi ----------
   const foto = (d.photos || []).map((b, i) => {
@@ -256,6 +314,64 @@ export function buatPdfRapor(d: Data): PDFKit.PDFDocument {
   gambarPanel(kiri, "REKAP PRESENSI", barisKiri, catatanKiri);
   gambarPanel(kiri + wPanel + 10, "TUMBUH KEMBANG TERKINI", barisKanan);
   y = yPanel + hPanel + 16;
+
+  // ---------- Pertumbuhan Fisik (diagram dari titik ukur anak sendiri) ----------
+  const diagramPdf = (judul: string, satuan: string, warna: string, titik: Array<{ tanggal: string; nilai: number }>) => {
+    if (titik.length === 0) return;
+    const hChart = 92;
+    pastikan(hChart + 30);
+    doc.font("Helvetica-Bold").fontSize(10).fillColor(GELAP).text(`${judul} (${satuan})`, kiri, y, { width: lebar });
+    y += 14;
+    const x0 = kiri + 32, x1 = kiri + lebar - 8;
+    const yAtas = y + 10, yBawah = y + hChart - 16;
+    const vals = titik.map((t) => t.nilai);
+    let mn = Math.min(...vals);
+    let mx = Math.max(...vals);
+    if (mn === mx) { mn -= 1; mx += 1; }
+    const padN = (mx - mn) * 0.15;
+    mn -= padN;
+    mx += padN;
+    const X = (i: number) => (titik.length === 1 ? (x0 + x1) / 2 : x0 + (i * (x1 - x0)) / (titik.length - 1));
+    const Y = (v: number) => yAtas + (1 - (v - mn) / (mx - mn)) * (yBawah - yAtas);
+    doc.font("Helvetica").fontSize(7.5).fillColor(ABU);
+    doc.text(mx.toFixed(1), kiri, yAtas - 3, { width: 28, align: "right" });
+    doc.text(mn.toFixed(1), kiri, yBawah - 3, { width: 28, align: "right" });
+    if (titik.length > 1) {
+      doc.moveTo(X(0), Y(titik[0].nilai));
+      for (let i = 1; i < titik.length; i++) doc.lineTo(X(i), Y(titik[i].nilai));
+      doc.lineWidth(1.4).strokeColor(warna).stroke();
+    }
+    for (let i = 0; i < titik.length; i++) {
+      doc.circle(X(i), Y(titik[i].nilai), 2.6).fill(warna);
+      doc.font("Helvetica").fontSize(7.5).fillColor(TINTA)
+        .text(String(titik[i].nilai).replace(".", ","), X(i) - 14, Y(titik[i].nilai) - 12, { width: 28, align: "center" });
+    }
+    y = yBawah + 16;
+  };
+
+  judulSeksi("Pertumbuhan Fisik");
+  if (d.agregat.pengukuran.length === 0) {
+    pastikan(16);
+    doc.font("Helvetica").fontSize(9.8).fillColor("#3c454e")
+      .text("Belum ada data pengukuran berat dan tinggi badan anak sampai akhir periode ini. Bagian ini terisi otomatis dari titik pengukuran anak sendiri — tanpa garis acuan dan tanpa penilaian medis.", kiri, y, { width: lebar, lineGap: 1.5 });
+    y += 30;
+  } else {
+    diagramPdf("Berat Badan", "kg", "#b3541e",
+      d.agregat.pengukuran.filter((p) => p.berat_kg !== null).map((p) => ({ tanggal: p.tanggal, nilai: p.berat_kg as number })));
+    diagramPdf("Tinggi Badan", "cm", "#4F7A54",
+      d.agregat.pengukuran.filter((p) => p.tinggi_cm !== null).map((p) => ({ tanggal: p.tanggal, nilai: p.tinggi_cm as number })));
+    if (d.agregat.pengukuran.length === 1) {
+      doc.font("Helvetica").fontSize(8.5).fillColor(ABU)
+        .text("Baru satu titik pengukuran tercatat — garis pertumbuhan tergambar sesudah pengukuran berikutnya.", kiri, y, { width: lebar });
+      y += 14;
+    }
+  }
+  if (d.narratives.narasi_pertumbuhan) kotakKrem(String(d.narratives.narasi_pertumbuhan));
+
+  if (d.tanggapan_ortu) {
+    judulSeksi("Tanggapan & Masukan Orang Tua");
+    kotakKrem(d.tanggapan_ortu);
+  }
 
   // ---------- Kaki ----------
   const guru = d.teacher || "Guru kelas";

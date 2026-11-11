@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 
-// Merek sekolah dari identitas (Pengaturan): logo + baris kop.
-// Memuat sekali per sesi dari /api/identitas; tampil hanya bila sekolah
-// sudah mengunggah logo, supaya tata letak tanpa logo tidak berubah.
+// Merek lembaga dari identitas (Pengaturan): logo + kop tiga baris.
+// Memuat sekali per sesi dari /api/identitas.
 
-type Identitas = { nama: string; tagline: string; logo_url: string | null };
+type Identitas = {
+  nama: string; tagline: string; logo_url: string | null;
+  nama_yayasan?: string; nama_gabungan?: string; tagline_gabungan?: string;
+  warna_zkc?: string; warna_sam?: string;
+};
 
 let janji: Promise<Identitas | null> | null = null;
 function muat(): Promise<Identitas | null> {
@@ -31,18 +34,29 @@ export function useIdentitas(): Identitas | null {
   return data;
 }
 
-// Baris merek ringkas: logo di kiri, kop sekolah di sampingnya.
-// Dipakai di kepala laporan & rapor web (menyamai PDF).
+// Kop resmi tiga baris yang terkunci: yayasan, nama gabungan dua rumah,
+// tagline gabungan. Dipakai di kepala laporan & rapor web (menyamai PDF);
+// logo tampil di kiri bila sudah diunggah.
 export function MerekSekolah({ gayaLogo }: { gayaLogo?: React.CSSProperties }) {
   const identitas = useIdentitas();
-  if (!identitas?.logo_url) return null;
+  if (!identitas) return null;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/api/identitas/logo" alt={`Logo ${identitas.nama}`} style={{ height: 34, maxWidth: 120, objectFit: "contain", ...gayaLogo }} />
-      <span style={{ color: "#77828e", fontWeight: 700, fontSize: 12, letterSpacing: "0.12em", textTransform: "uppercase" }}>
-        {identitas.tagline ? `${identitas.nama} — ${identitas.tagline}` : identitas.nama}
-      </span>
+      {identitas.logo_url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src="/api/identitas/logo" alt={`Logo ${identitas.nama}`} style={{ height: 40, maxWidth: 120, objectFit: "contain", ...gayaLogo }} />
+      ) : null}
+      <div>
+        <div style={{ color: "#77828e", fontWeight: 700, fontSize: 10.5, letterSpacing: "0.14em", textTransform: "uppercase" }}>
+          {identitas.nama_yayasan || identitas.nama}
+        </div>
+        <div style={{ color: "#2f353c", fontWeight: 800, fontSize: 14.5, letterSpacing: "0.02em" }}>
+          {identitas.nama_gabungan || identitas.nama}
+        </div>
+        <div style={{ color: "#77828e", fontSize: 11 }}>
+          {identitas.tagline_gabungan || identitas.tagline}
+        </div>
+      </div>
     </div>
   );
 }

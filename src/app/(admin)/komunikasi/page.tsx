@@ -21,7 +21,7 @@ export default function KomunikasiPage() {
         { label: "Pesan Orang Tua", value: counts.data ? counts.data.counts.parent_messages : "...", icon: "✉", tone: "tone-sky" },
         { label: "Belum Dibaca", value: mods.data ? unread : "...", icon: "✉", tone: "tone-peach" },
         { label: "Pengumuman", value: counts.data ? counts.data.counts.announcements : "...", icon: "📣", tone: "tone-sage" },
-        { label: "Ulasan Orang Tua", value: counts.data ? counts.data.counts.parent_reviews : "...", icon: "★", tone: "tone-pink" },
+        { label: "Ulasan Orang Tua", value: counts.data ? counts.data.counts.parent_reviews : "...", icon: "❝", tone: "tone-pink" },
       ]} />
       <DataSection
         title="Pengumuman Sekolah"

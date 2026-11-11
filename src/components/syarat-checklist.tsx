@@ -26,7 +26,7 @@ export function cekSyaratLokal(input: {
   };
   const kurang: string[] = [];
   if (!state.fasilitator) kurang.push("Fasilitator utama belum dipilih.");
-  if (!state.aktivitas) kurang.push("Belum ada aktivitas dengan rating bintang dan aparatus terisi.");
+  if (!state.aktivitas) kurang.push("Belum ada aktivitas dengan penilaian kata dan aparatus terisi.");
   if (!state.foto) kurang.push("Belum ada foto — unggah minimal 1 foto dokumentasi.");
   return { ok: kurang.length === 0, kurang, state };
 }
@@ -34,7 +34,7 @@ export function cekSyaratLokal(input: {
 export function SyaratChecklist({ state }: { state: SyaratState }) {
   const baris: Array<[keyof SyaratState, string, string]> = [
     ["fasilitator", "Fasilitator utama dipilih", "Pilih Fasilitator Utama di panel kanan"],
-    ["aktivitas", "Aktivitas berbintang + aparatus terisi", "Isi judul, aparatus, dan rating 1–4"],
+    ["aktivitas", "Aktivitas dinilai (kata) + aparatus terisi", "Isi judul, aparatus, dan penilaian kata"],
     ["foto", "Minimal 1 foto dokumentasi", "Unggah foto di bagian Foto & Video"],
   ];
   return (

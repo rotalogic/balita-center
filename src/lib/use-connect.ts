@@ -6,6 +6,7 @@ export type ConnectData = {
   child: Record<string, string | null> | null;
   report: Record<string, string | null> | null;
   activities: Array<Record<string, string | null>>;
+  segments?: Array<Record<string, string | null>>;
   health: Array<Record<string, string | null>>;
   development: Array<Record<string, string | null>>;
   events: Array<Record<string, string | null>>;

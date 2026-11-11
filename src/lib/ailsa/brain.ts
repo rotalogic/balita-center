@@ -271,7 +271,7 @@ export async function simpanLeadDariKeluaran(wa: string, keluaran: Keluaran, lea
     leadId ||
     (
       await query<{ id: string; child_name: string | null }>(
-        `SELECT id, child_name FROM leads WHERE wa_number = $1 AND stage <> 'ditolak'
+        `SELECT id, child_name FROM leads WHERE wa_number = $1 AND stage <> 'tidak_lanjut'
           ORDER BY (child_name IS NOT NULL) DESC, created_at ASC LIMIT 1`,
         [wa]
       )
@@ -280,7 +280,7 @@ export async function simpanLeadDariKeluaran(wa: string, keluaran: Keluaran, lea
   if (!target) {
     const rows = await query<{ id: string }>(
       `INSERT INTO leads (wa_number, parent_name, child_name, child_age_months, source, bot_status, stage, ailsa_state)
-       VALUES ($1,$2,$3,$4,'whatsapp_ailsa','baru','lead_masuk',$5::jsonb) RETURNING id`,
+       VALUES ($1,$2,$3,$4,'whatsapp_ailsa','baru','inquiry',$5::jsonb) RETURNING id`,
       [wa, rapi.parent_name, rapi.child_name, rapi.child_age_months, JSON.stringify(keluaran)]
     );
     return { dibuat: true, id: rows[0].id };

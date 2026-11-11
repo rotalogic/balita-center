@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PageHead, StatusBadge } from "@/components/chrome";
 import { ApiError, DataSection, KpiGrid, dateFmt, rupiahFmt, useApi, type AnyRow } from "@/components/module-ui";
+import SkemaBiaya from "@/components/skema-biaya";
 
 type Finance = { invoices: AnyRow[]; entries: AnyRow[]; monthIn: number; monthOut: number };
 type Meta = {
@@ -138,6 +139,7 @@ export default function KeuanganPage() {
     <>
       <PageHead title="Keuangan" subtitle="Buku Kas, tagihan SPP, pembayaran, nota, dan payroll" />
       <ApiError error={error} />
+      <SkemaBiaya />
       <KpiGrid items={[
         { label: "Pemasukan Bulan Ini", value: data ? rupiahFmt(data.monthIn) : "...", icon: "▦", tone: "tone-sage" },
         { label: "Pengeluaran Bulan Ini", value: data ? rupiahFmt(data.monthOut) : "...", icon: "▦", tone: "tone-peach" },

@@ -27,8 +27,10 @@ export async function GET(request: Request) {
       );
       return NextResponse.json({ ok: true, children: sampah, trash: true });
     }
+    const kategori = (searchParams.get("kategori") || "").trim();
     const rows = await query(
       `SELECT c.id, c.full_name, c.nickname, c.birth_date, c.gender, c.status, c.photo_url,
+              c.kategori_program, c.label_status,
               b.name AS branch_name,
               (SELECT cl.name FROM enrollments e JOIN classes cl ON cl.id = e.class_id
                 WHERE e.child_id = c.id AND e.status = 'aktif' ORDER BY e.start_date DESC LIMIT 1) AS class_name,
@@ -38,9 +40,10 @@ export async function GET(request: Request) {
          JOIN branches b ON b.id = c.branch_id
         WHERE c.deleted_at IS NULL AND ($1 = '' OR c.full_name ILIKE '%' || $1 || '%')
           AND ($2::uuid[] IS NULL OR c.branch_id = ANY($2::uuid[]))
+          AND ($3 = '' OR c.kategori_program = $3)
         ORDER BY c.full_name
         LIMIT 200`,
-      [q, scope]
+      [q, scope, kategori]
     );
     return NextResponse.json({ ok: true, children: rows });
   } catch (error) {
@@ -59,11 +62,20 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, error: `Kolom wajib belum diisi: ${field}` }, { status: 400 });
       }
     }
+    // Kategori program wajib tegas: dari isian formulir, atau turunan area program.
+    let kategori = body.kategori_program || "";
+    if (!["ZKC", "SAM"].includes(kategori)) {
+      const prog = await query<{ area: string }>("SELECT area FROM programs WHERE id = $1::uuid", [body.program_id]);
+      kategori = prog[0]?.area === "SAM" ? "SAM" : "ZKC";
+    }
+    const labelSah = ["Anggota", "Trial", "Insidentil", "Peserta Event", "Klien Skrining", "Klien Konsultasi"];
+    const label = labelSah.includes(body.label_status || "") ? body.label_status : "Anggota";
     const childRows = await query(
       `INSERT INTO children (branch_id, full_name, nickname, birth_date, gender, birth_place, religion,
                              blood_type, health_notes, special_needs, languages, hobbies,
-                             transport_mode, photo_consent, photo_url, enrolled_on)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+                             transport_mode, photo_consent, photo_url, enrolled_on,
+                             kategori_program, label_status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
        RETURNING id`,
       [
         body.branch_id,
@@ -83,6 +95,8 @@ export async function POST(request: Request) {
         // Hanya terima URL internal hasil unggahan — cegah javascript:/remote URL.
         body.photo_url && body.photo_url.startsWith("/api/files/") ? body.photo_url : null,
         body.enrolled_on || null,
+        kategori,
+        label,
       ]
     );
     const childId = (childRows[0] as { id: string }).id;
@@ -118,7 +132,7 @@ export async function POST(request: Request) {
     if (body.lead_id) {
       await query(
         `UPDATE leads
-            SET stage = 'terdaftar', bot_status = 'terdaftar',
+            SET stage = 'registrasi_orientasi', bot_status = 'terdaftar',
                 converted_child_id = $1, updated_at = now()
           WHERE id = $2`,
         [childId, body.lead_id]

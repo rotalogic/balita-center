@@ -3,6 +3,7 @@ import { dbErrorMessage, query } from "@/lib/db";
 import { branchScope, guard } from "@/lib/current-user";
 import { cekSyaratTerbit } from "@/lib/syarat-terbit";
 import { catatAudit } from "@/lib/audit";
+import { SEGMEN_ZKC } from "@/lib/segmen";
 
 export const dynamic = "force-dynamic";
 
@@ -89,7 +90,24 @@ export async function POST(request: Request) {
       activities?: ActivityInput[];
       photo_urls?: string[];
       photos?: Array<{ photo_url: string; media_type?: string; mime_type?: string; poster_url?: string; caption?: string }>;
+      segmen?: Record<string, string>;
     };
+
+    // Anak yang tercatat tidak hadir (izin/sakit/alpa) tidak dibuatkan laporan
+    // hari itu — kaidah Modul Laporan Harian.
+    const presensi = await query<{ status: string }>(
+      "SELECT status FROM child_attendance WHERE child_id = $1 AND att_date = $2",
+      [body.child_id, body.report_date]
+    );
+    if (presensi.length > 0 && presensi[0].status !== "hadir") {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Anak tercatat ${presensi[0].status} pada tanggal laporan — laporan harian tidak dibuat untuk anak yang tidak hadir.`,
+        },
+        { status: 422 }
+      );
+    }
 
     const duplikat = await query<{ id: string; child_name: string }>(
       `SELECT r.id, c.full_name AS child_name
@@ -139,7 +157,7 @@ export async function POST(request: Request) {
         body.mood_notes || null,
         body.notes || null,
         body.circle_theme || null,
-        body.circle_rating ? Number(body.circle_rating) : null,
+        body.circle_rating ? Math.max(1, Math.min(3, Number(body.circle_rating))) : null,
         body.circle_notes || null,
         body.special_moment || null,
         body.home_suggestion || null,
@@ -162,7 +180,7 @@ export async function POST(request: Request) {
           activity.area || null,
           activity.apparatus || null,
           activity.title,
-          activity.rating || null,
+          activity.rating ? Math.max(1, Math.min(3, Number(activity.rating))) : null,
           activity.notes || null,
           activity.photo_url || null,
           index,
@@ -174,13 +192,13 @@ export async function POST(request: Request) {
       );
     }
     // Aktivitas yang memilih milestone ikut tercatat sebagai observasi
-    // perkembangan anak (bintang = tingkat capaian).
+    // perkembangan anak (penilaian kata = tingkat capaian).
     for (const activity of body.activities || []) {
       if (!activity.title || !activity.milestone_id) continue;
       await query(
         `INSERT INTO milestone_observations (child_id, milestone_id, observed_on, level, report_id, material_id, created_by)
          VALUES ($1,$2::uuid,$3,$4,$5,$6::uuid,$7::uuid)`,
-        [body.child_id, activity.milestone_id, body.report_date, activity.rating || null, reportId, activity.material_id || null, body.created_by || null]
+        [body.child_id, activity.milestone_id, body.report_date, activity.rating ? Math.max(1, Math.min(3, Number(activity.rating))) : null, reportId, activity.material_id || null, body.created_by || null]
       );
     }
     if (Array.isArray(body.photos)) {
@@ -195,6 +213,18 @@ export async function POST(request: Request) {
       for (const url of body.photo_urls || []) {
         if (!url) continue;
         await query("INSERT INTO daily_report_photos (report_id, photo_url) VALUES ($1,$2)", [reportId, url]);
+      }
+    }
+
+    // Segmen sesi resmi ZKC (9 segmen) yang terisi pada laporan ini.
+    if (body.segmen) {
+      for (const s of SEGMEN_ZKC) {
+        const catatan = String(body.segmen[s.kunci] || "").trim();
+        if (!catatan) continue;
+        await query(
+          "INSERT INTO daily_report_segments (report_id, segmen, catatan) VALUES ($1,$2,$3) ON CONFLICT (report_id, segmen) DO UPDATE SET catatan = EXCLUDED.catatan",
+          [reportId, s.kunci, catatan]
+        );
       }
     }
 

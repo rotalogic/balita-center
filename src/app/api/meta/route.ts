@@ -12,7 +12,7 @@ export async function GET() {
   try {
     const [branches, programs, classes, staff, materials, milestones, materialMilestones] = await Promise.all([
       query("SELECT id, code, name FROM branches WHERE deleted_at IS NULL ORDER BY name"),
-      query("SELECT id, code, name, monthly_fee FROM programs WHERE deleted_at IS NULL ORDER BY name"),
+      query("SELECT id, code, name, monthly_fee, area FROM programs WHERE deleted_at IS NULL ORDER BY name"),
       query("SELECT id, branch_id, program_id, name FROM classes WHERE deleted_at IS NULL ORDER BY name"),
       query("SELECT id, branch_id, full_name, position FROM staff WHERE deleted_at IS NULL ORDER BY full_name"),
       // Katalog Montessori AMI + milestone untuk pemilih di editor laporan.
@@ -40,8 +40,9 @@ export async function POST(request: Request) {
     if (kind === "program") {
       if (!body.code || !body.name) return NextResponse.json({ ok: false, error: "Kode dan nama program wajib diisi." }, { status: 400 });
       const rows = await query(
-        "INSERT INTO programs (code, name, monthly_fee, screening_fee) VALUES ($1,$2,$3,$4) RETURNING id, code, name",
-        [body.code, body.name, body.monthly_fee ? Number(body.monthly_fee) : null, body.screening_fee ? Number(body.screening_fee) : null]
+        "INSERT INTO programs (code, name, monthly_fee, screening_fee, area) VALUES ($1,$2,$3,$4,$5) RETURNING id, code, name",
+        [body.code, body.name, body.monthly_fee ? Number(body.monthly_fee) : null, body.screening_fee ? Number(body.screening_fee) : null,
+         body.area === "SAM" ? "SAM" : "ZKC"]
       );
       return NextResponse.json({ ok: true, item: rows[0] });
     }

@@ -18,11 +18,59 @@ export const NARASI_MONTESSORI: Array<[string, string]> = [
   ["narrative_cultural", "Cultural"],
 ];
 
+// Catatan perkembangan dalam urutan resmi lembaga: latar belakang, gambaran
+// umum, kekuatan anak, kemampuan yang sedang berkembang, area dukungan.
+export const NARASI_PERKEMBANGAN: Array<[string, string]> = [
+  ["narrative_latar", "Latar Belakang"],
+  ["narrative_gambaran", "Gambaran Umum"],
+  ["narrative_kekuatan", "Kekuatan Anak"],
+  ["narrative_berkembang", "Kemampuan yang Sedang Berkembang"],
+  ["narrative_dukungan", "Area yang Memerlukan Dukungan"],
+];
+
+export const NARASI_INGGRIS: Array<[string, string]> = [
+  ["inggris_kata", "Gugus Kata & Ungkapan yang Dikenalkan"],
+  ["inggris_respons", "Respons Lisan Anak"],
+];
+
+// Tahap pengamatan Kurikulum Bahasa Inggris Dasar lembaga (tiga tahap);
+// nama tahap resmi mengikuti kurikulum lembaga.
+export const LABEL_TAHAP_INGGRIS: Record<number, string> = {
+  1: "Tahap Pengamatan 1",
+  2: "Tahap Pengamatan 2",
+  3: "Tahap Pengamatan 3",
+};
+
+export const NARASI_ISLAM_ARAB: Array<[string, string]> = [
+  ["islam_doa", "Doa Harian"],
+  ["islam_hadis", "Hadis Pilihan"],
+  ["islam_juz30", "Pengenalan Juz 30"],
+  ["islam_hijaiyah", "Huruf Hijaiyah & Tangga Menulis"],
+  ["islam_ummi", "Mengaji Metode Ummi"],
+];
+
+export const NARASI_ATENSI: Array<[string, string]> = [
+  ["atensi_durasi", "Lama Bertahan pada Satu Pekerjaan"],
+  ["atensi_pengulangan", "Pengulangan yang Dipilih Anak"],
+  ["atensi_siklus", "Penyelesaian Siklus Kerja"],
+  ["atensi_fokus", "Kembali Fokus Sesudah Terdistraksi"],
+];
+
 export const KOLOM_NARASI: string[] = [
   ...NARASI_STPPA.map(([k]) => k),
   ...NARASI_MONTESSORI.map(([k]) => k),
   "conclusion",
   "parent_suggestion",
+  "ringkasan_ortu",
+  ...NARASI_PERKEMBANGAN.map(([k]) => k),
+  "narrative_kelekatan",
+  "narrative_tema",
+  "profil_cara_belajar",
+  ...NARASI_INGGRIS.map(([k]) => k),
+  ...NARASI_ISLAM_ARAB.map(([k]) => k),
+  ...NARASI_ATENSI.map(([k]) => k),
+  "narasi_pertumbuhan",
+  "tips_pola_asuh",
 ];
 
 const GIZI: Record<string, string> = {
@@ -53,5 +101,8 @@ export type AgregatRapor = {
   lingkar_kepala_cm: string | null;
   status_gizi: string | null;
   tanggal_ukur: string | null;
+  // Seluruh titik pengukuran anak sampai akhir siklus (untuk diagram garis
+  // berat & tinggi badan dari data anak itu sendiri).
+  pengukuran: Array<{ tanggal: string; berat_kg: number | null; tinggi_cm: number | null }>;
   foto: Array<{ url: string; caption: string | null; media_type?: string; poster_url?: string | null }>;
 };

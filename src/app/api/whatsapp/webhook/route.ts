@@ -79,7 +79,7 @@ async function prosesPesan(m: { id: string; from: string; type: string; text?: {
   // (bot_conversations.lead_id wajib dan ber-FK).
   const lead = await query<{ id: string; opt_out: boolean; takeover_at: string | null }>(
     `INSERT INTO leads (wa_number, source, bot_status, stage)
-     SELECT $1::varchar, 'whatsapp_ailsa', 'baru', 'lead_masuk'
+     SELECT $1::varchar, 'whatsapp_ailsa', 'baru', 'inquiry'
       WHERE NOT EXISTS (SELECT 1 FROM leads WHERE wa_number = $1::varchar)`,
     [wa]
   ).then(() =>

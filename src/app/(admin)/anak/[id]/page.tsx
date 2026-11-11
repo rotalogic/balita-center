@@ -6,6 +6,10 @@ import { useParams, useRouter } from "next/navigation";
 import { EmptyState, ErrorState, LoadingState, PageHead, StatusBadge } from "@/components/chrome";
 import { tanggalPanjang } from "@/lib/format";
 import { labelGizi } from "@/lib/rapor-data";
+import { kataSkor } from "@/lib/skala";
+import { LencanaKategori, LencanaLabel } from "@/components/lencana-anak";
+import KartuKesepakatan from "@/components/kartu-kesepakatan";
+import KartuRujukan from "@/components/kartu-rujukan";
 
 type Row = Record<string, string | number | null>;
 type Payload = {
@@ -186,7 +190,13 @@ export default function DetailAnakPage() {
               />
             ) : null}
             <p><StatusBadge status={String(child.status || "aktif")} /></p>
+            <p style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <LencanaKategori kategori={String(child.kategori_program || "ZKC")} />
+              <LencanaLabel label={String(child.label_status || "Anggota")} />
+            </p>
             <dl>
+              <dt className="muted">Kategori program</dt><dd>{String(child.kategori_program || "ZKC") === "SAM" ? "Sekolah Alam Montessori" : "Ziel Kids Club"}</dd>
+              <dt className="muted">Label status</dt><dd>{String(child.label_status || "Anggota")}</dd>
               <dt className="muted">Tanggal lahir</dt><dd>{tanggalPanjang(child.birth_date as string)}</dd>
               <dt className="muted">Tempat lahir</dt><dd>{String(child.birth_place || "-")}</dd>
               <dt className="muted">Jenis kelamin</dt><dd>{labelAtau(LABEL_GENDER, child.gender)}</dd>
@@ -197,6 +207,8 @@ export default function DetailAnakPage() {
               <dt className="muted">Tanggal masuk</dt><dd>{tanggalPanjang(child.enrolled_on as string)}</dd>
             </dl>
           </article>
+          <KartuKesepakatan childId={String(child.id)} />
+          <KartuRujukan childId={String(child.id)} childName={String(child.full_name || "")} />
           <article className="card">
             <h2>Orang Tua / Wali</h2>
             {data.guardians.length === 0 ? (
@@ -241,7 +253,7 @@ export default function DetailAnakPage() {
                     <li key={String(o.id)}>
                       <time>{String(o.observed_on || "")}</time>
                       <div>{String(o.indikator)}
-                        <div className="muted">Usia {String(o.age_group || "-")}{o.level ? <> · Capaian {"★".repeat(Number(o.level))}{"☆".repeat(4 - Number(o.level))}</> : null}</div>
+                        <div className="muted">Usia {String(o.age_group || "-")}{o.level ? <> · Capaian {kataSkor(o.level)}</> : null}</div>
                       </div>
                     </li>
                   ))}

@@ -9,6 +9,7 @@ type Anak = {
   gender: string | null; blood_type: string | null; status: string | null;
   health_notes: string | null; special_needs: string | null; languages: string | null;
   hobbies: string | null; transport_mode: string | null;
+  kategori_program: string | null; label_status: string | null;
 };
 
 // Formulir ubah data anak — memakai field yang sama dengan wizard tambah anak.
@@ -87,6 +88,16 @@ export default function UbahAnak({ params }: { params: { id: string } }) {
               <option value="cuti">Cuti</option>
               <option value="lulus">Lulus</option>
               <option value="berhenti">Berhenti</option>
+            </select></div>
+          <div className="field"><label htmlFor="kategori_program">Kategori Program</label>
+            <select id="kategori_program" value={form.kategori_program || "ZKC"} onChange={(e) => set("kategori_program", e.target.value)}>
+              <option value="ZKC">Ziel Kids Club (ZKC)</option>
+              <option value="SAM">Sekolah Alam Montessori (SAM)</option>
+            </select>
+            <span className="hint">Perubahan kategori oleh founder/manager tercatat di Jejak Audit.</span></div>
+          <div className="field"><label htmlFor="label_status">Label Status Anak</label>
+            <select id="label_status" value={form.label_status || "Anggota"} onChange={(e) => set("label_status", e.target.value)}>
+              {["Anggota", "Trial", "Insidentil", "Peserta Event", "Klien Skrining", "Klien Konsultasi"].map((l) => (<option key={l} value={l}>{l}</option>))}
             </select></div>
           <div className="field"><label htmlFor="health_notes">Catatan Kesehatan / Alergi</label>
             <input id="health_notes" value={form.health_notes || ""} onChange={(e) => set("health_notes", e.target.value)} /></div>

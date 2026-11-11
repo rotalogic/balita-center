@@ -21,7 +21,7 @@ function hitungHariSekolah(mulai: string, akhir: string): number {
 }
 
 export async function agregatRapor(childId: string, mulai: string, akhir: string, reportId?: string): Promise<AgregatRapor> {
-  const [presensi, laporan, ukur, fotoLaporan, fotoAktivitas, fotoSendiri] = await Promise.all([
+  const [presensi, laporan, ukur, fotoLaporan, fotoAktivitas, fotoSendiri, seriUkur] = await Promise.all([
     query<{ status: string; n: string }>(
       `SELECT status, count(*)::text AS n FROM child_attendance
         WHERE child_id = $1 AND att_date BETWEEN $2::date AND $3::date
@@ -64,6 +64,14 @@ export async function agregatRapor(childId: string, mulai: string, akhir: string
           [reportId]
         )
       : Promise.resolve([] as Array<{ url: string; caption: string | null }>),
+    query<{ checked_on: string; weight_kg: string | null; height_cm: string | null }>(
+      `SELECT checked_on::text AS checked_on, weight_kg, height_cm
+         FROM health_checks
+        WHERE child_id = $1 AND checked_on <= $2::date
+          AND (weight_kg IS NOT NULL OR height_cm IS NOT NULL)
+        ORDER BY checked_on ASC LIMIT 24`,
+      [childId, akhir]
+    ),
   ]);
 
   const hitung = (status: string) => Number(presensi.find((p) => p.status === status)?.n || 0);
@@ -107,6 +115,11 @@ export async function agregatRapor(childId: string, mulai: string, akhir: string
     lingkar_kepala_cm: u?.head_circumference_cm ?? null,
     status_gizi: u?.nutrition_status ?? null,
     tanggal_ukur: u?.checked_on ?? null,
+    pengukuran: seriUkur.map((s) => ({
+      tanggal: s.checked_on,
+      berat_kg: s.weight_kg !== null ? Number(s.weight_kg) : null,
+      tinggi_cm: s.height_cm !== null ? Number(s.height_cm) : null,
+    })),
     foto,
   };
 }

@@ -7,13 +7,15 @@ import { rapikanLead } from "@/lib/lead";
 export const dynamic = "force-dynamic";
 
 const STAGES = [
-  "lead_masuk",
-  "dihubungi",
-  "trial_terjadwal",
-  "trial_selesai",
-  "diterima",
-  "ditolak",
-  "terdaftar",
+  "inquiry",
+  "formulir_triase",
+  "penjadwalan",
+  "trial_discovery",
+  "wawancara",
+  "sesi_hasil",
+  "registrasi_orientasi",
+  "baseline",
+  "tidak_lanjut",
 ] as const;
 
 export async function GET() {
@@ -84,7 +86,7 @@ export async function POST(request: Request) {
     }
 
     const duplikat = await query<{ id: string }>(
-      "SELECT id FROM leads WHERE wa_number = $1 AND stage NOT IN ('ditolak') LIMIT 1",
+      "SELECT id FROM leads WHERE wa_number = $1 AND stage NOT IN ('tidak_lanjut') LIMIT 1",
       [wa]
     );
     if (duplikat.length > 0) {
@@ -100,7 +102,7 @@ export async function POST(request: Request) {
       `INSERT INTO leads (wa_number, parent_name, child_name, child_age_months, branch_id,
                           interested_program_id, source, bot_status, stage, notes,
                           perlu_tinjau, tinjau_alasan)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'baru','lead_masuk',$8,$9,$10) RETURNING id`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'baru','inquiry',$8,$9,$10) RETURNING id`,
       [
         wa,
         parent,
@@ -120,7 +122,7 @@ export async function POST(request: Request) {
       entityTable: "leads",
       entityId: rows[0].id,
       branchId: body.branch_id || null,
-      detail: { nama: child || parent || null, orang_tua: parent || null, usia_bulan: umur, tahap: "lead_masuk", sumber: body.source || "manual" },
+      detail: { nama: child || parent || null, orang_tua: parent || null, usia_bulan: umur, tahap: "inquiry", sumber: body.source || "manual" },
     });
     return NextResponse.json({ ok: true, id: rows[0].id });
   } catch (error) {

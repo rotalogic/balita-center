@@ -61,6 +61,7 @@ const EDITABLE = ["draft", "revisi"];
 export default function DailyReportDetailPage({ params }: { params: { id: string } }) {
   const [report, setReport] = useState<Report | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [segments, setSegments] = useState<Array<{ segmen: string; catatan: string }>>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [kurang, setKurang] = useState<string[]>([]);
@@ -77,6 +78,7 @@ export default function DailyReportDetailPage({ params }: { params: { id: string
         }
         setReport(data.report);
         setActivities(data.activities || []);
+        setSegments(data.segments || []);
         setPhotos(data.photos || []);
       })
       .catch(() => setError("Tidak dapat menghubungi server."));
@@ -168,6 +170,7 @@ export default function DailyReportDetailPage({ params }: { params: { id: string
         <LaporanWeb
           report={report}
           activities={activities}
+          segments={segments}
           childName={report.child_name}
           reporterName={report.teacher_name}
           reporterPhoto={report.teacher_photo}

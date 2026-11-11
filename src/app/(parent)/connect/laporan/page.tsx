@@ -27,6 +27,10 @@ export default function ConnectLaporanPage() {
     <LaporanWeb
       report={r as never}
       activities={activities}
+      segments={((data.segments || []) as Array<Record<string, unknown>>).map((s) => ({
+        segmen: String(s.segmen),
+        catatan: String(s.catatan ?? ""),
+      }))}
       childName={String(data.child.full_name)}
       reporterName={reporter}
       reporterPhoto={(r.teacher_photo as string) || null}
