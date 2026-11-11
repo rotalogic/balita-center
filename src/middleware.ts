@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { bacaSession, signSession, SESI_IDLE_DETIK } from "@/lib/session";
 
-// Rute publik: halaman auth + endpoint auth.
+// Rute publik: halaman auth + endpoint auth + website publik lembaga.
 const PUBLIC_PAGES = ["/login", "/register", "/forgot", "/reset"];
 
 export async function middleware(request: NextRequest) {
@@ -18,8 +18,15 @@ export async function middleware(request: NextRequest) {
   // Identitas sekolah (nama + logo) bersifat publik — tampil di layar login
   // sebelum pengguna masuk; tidak memuat data pribadi apa pun.
   const identitasPublik = pathname === "/api/identitas" || pathname === "/api/identitas/logo";
-  const publicApi = pathname.startsWith("/api/auth/") || pathname.startsWith("/api/whatsapp/") || pathname === "/api/health" || jobDenganToken || webhookGateway || identitasPublik;
-  if (PUBLIC_PAGES.includes(pathname) || publicApi) {
+  // Laporan pelanggaran CSP datang dari browser pengunjung tanpa sesi —
+  // endpoint-nya hanya mencatat (tanpa database) dan selalu menjawab 204.
+  const laporanCsp = pathname === "/api/csp-report";
+  // Website publik lembaga: halaman /website/* dan API /api/publik/* terbuka
+  // tanpa sesi — isinya hanya bahan publik yang lolos kaidah halaman publik.
+  const websitePublik = pathname === "/website" || pathname.startsWith("/website/");
+  const apiPublik = pathname === "/api/publik" || pathname.startsWith("/api/publik/");
+  const publicApi = pathname.startsWith("/api/auth/") || pathname.startsWith("/api/whatsapp/") || pathname === "/api/health" || jobDenganToken || webhookGateway || identitasPublik || laporanCsp || apiPublik;
+  if (PUBLIC_PAGES.includes(pathname) || websitePublik || publicApi) {
     return NextResponse.next();
   }
 
