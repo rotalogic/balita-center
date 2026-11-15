@@ -110,6 +110,15 @@ export function emailUndangan(to: string, nama: string, url: string, peran: stri
   });
 }
 
+export function emailPersetujuanAkun(to: string, nama: string, url: string) {
+  return kirimEmail({
+    to,
+    subject: "Akun Balita Center Anda sudah disetujui",
+    text: `Halo ${nama},\n\nPendaftaran akun Balita Center Anda sudah disetujui. Buka tautan ini untuk membuat kata sandi lalu masuk (berlaku 3 hari):\n${url}\n\nBila Anda mendaftar sendiri, Anda juga bisa langsung masuk dengan kata sandi yang Anda buat saat mendaftar.`,
+    html: `<p>Halo ${nama},</p><p>Pendaftaran akun <strong>Balita Center</strong> Anda sudah disetujui.</p><p>Buka tautan ini untuk membuat kata sandi lalu masuk (berlaku 3 hari):</p><p><a href="${url}">${url}</a></p><p>Bila Anda mendaftar sendiri, Anda juga bisa langsung masuk dengan kata sandi yang Anda buat saat mendaftar.</p>`,
+  });
+}
+
 export function emailLaporanTerbit(to: string, d: { wali: string; anak: string; tanggal: string; tautan: string }) {
   return kirimEmail({
     to,

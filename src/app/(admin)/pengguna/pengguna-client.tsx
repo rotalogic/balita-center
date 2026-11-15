@@ -62,7 +62,19 @@ export function PenggunaClient({ bagian }: { bagian?: string }) {
       setError(d.error || "Gagal menyimpan.");
       return;
     }
-    setInfo(label);
+    if (d.aktivasi?.url) {
+      setActivation(d.aktivasi.url);
+      const kirim: string[] = [];
+      if (d.aktivasi.email_terkirim) kirim.push("terkirim ke email pengguna");
+      if (d.aktivasi.wa === "terantre") kirim.push("masuk antrean WhatsApp");
+      setInfo(
+        kirim.length
+          ? `${label} Tautan aktivasi otomatis ${kirim.join(" dan ")}.`
+          : `${label} Tautan aktivasi otomatis dibuat, salin dari kotak tautan dan kirim ke pengguna.`
+      );
+    } else {
+      setInfo(label);
+    }
     load();
   }
 
@@ -120,7 +132,6 @@ export function PenggunaClient({ bagian }: { bagian?: string }) {
         <a className={bagian === "daftar" ? "btn" : "btn secondary"} href="/pengguna/daftar">Daftar Pengguna</a>
       </nav>
 
-      {(!bagian || bagian === "undang") && (<>
       {activation ? (
         <div className="card" role="status">
           <h2 style={{ marginTop: 0 }}>Tautan sekali pakai</h2>
@@ -133,6 +144,7 @@ export function PenggunaClient({ bagian }: { bagian?: string }) {
         </div>
       ) : null}
 
+      {(!bagian || bagian === "undang") && (<>
       <div className="card" style={{ marginTop: 12 }}>
         <h2 style={{ marginTop: 0 }}>Undang pengguna baru</h2>
         <form onSubmit={undang}>

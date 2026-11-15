@@ -1,7 +1,10 @@
+import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
 import { guard } from "@/lib/current-user";
 import { query } from "@/lib/db";
 import { catatAudit } from "@/lib/audit";
+import { hashToken } from "@/lib/reset-token";
+import { emailPersetujuanAkun, smtpConfigured } from "@/lib/mail";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +19,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   const body = (await request.json().catch(() => ({}))) as Body;
 
-  const rows = await query<{ id: string; role: string; is_active: boolean; email: string }>(
-    "SELECT id, role, is_active, email FROM users WHERE id = $1 AND deleted_at IS NULL",
+  const rows = await query<{ id: string; role: string; is_active: boolean; email: string; full_name: string; phone: string | null; status: string }>(
+    "SELECT id, role, is_active, email, full_name, phone, status FROM users WHERE id = $1 AND deleted_at IS NULL",
     [params.id]
   );
   const target = rows[0];
@@ -112,5 +115,58 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     [target.id]
   );
 
-  return NextResponse.json({ ok: true, user: updated[0] });
+  // Otomatis sesudah diterima: persetujuan dari antrean langsung membuatkan
+  // tautan aktivasi baru (berlaku 3 hari, sama seperti undangan), mencoba
+  // mengirimnya ke email dan antrean WhatsApp, dan mengembalikannya ke admin
+  // supaya bisa disalin bila kedua kanal belum terkonfigurasi. Tanpa langkah
+  // ini akun undangan tidak pernah bisa masuk: kata sandinya acak dan tidak
+  // diketahui siapa pun sampai pemilik akun membuatnya lewat tautan ini.
+  // Kegagalan aktivasi tidak membatalkan persetujuan yang sudah tersimpan.
+  let aktivasi: { url: string; email_terkirim: boolean; wa: string; berlaku_hari: number } | null = null;
+  if (body.status === "aktif" && target.status === "menunggu_persetujuan") {
+    try {
+      await query("UPDATE password_resets SET used_at = now() WHERE user_id = $1 AND used_at IS NULL", [target.id]);
+      const token = randomBytes(32).toString("hex");
+      await query(
+        `INSERT INTO password_resets (user_id, token_hash, expires_at)
+         VALUES ($1,$2, now() + ($3 || ' minutes')::interval)`,
+        [target.id, hashToken(token), String(60 * 24 * 3)]
+      );
+      const base = process.env.APP_BASE_URL || "http://localhost:3000";
+      const url = `${base}/reset?token=${token}`;
+
+      let emailTerkirim = false;
+      if (smtpConfigured()) {
+        const kirim = await emailPersetujuanAkun(target.email, target.full_name, url);
+        emailTerkirim = kirim.ok;
+        if (!kirim.ok) console.error(`[PERSETUJUAN] email gagal (${kirim.alasan}) untuk ${target.email}`);
+      }
+
+      let wa = "tanpa_nomor";
+      const digit = (target.phone || "").replace(/\D/g, "");
+      const nomor = digit.startsWith("0") ? `62${digit.slice(1)}` : digit.startsWith("8") ? `62${digit}` : digit;
+      if (nomor.length >= 10) {
+        const teks =
+          `Halo ${target.full_name}, pendaftaran akun Balita Center Anda sudah disetujui. ` +
+          `Buka tautan ini untuk membuat kata sandi lalu masuk (berlaku 3 hari): ${url}`;
+        await query(
+          "INSERT INTO wa_outbox (tujuan, teks_asli, konteks, dibuat_oleh) VALUES ($1, $2, $3::jsonb, $4)",
+          [nomor, teks, JSON.stringify({ jenis: "aktivasi_akun", user_id: target.id }), actor.id]
+        );
+        wa = "terantre";
+      }
+
+      aktivasi = { url, email_terkirim: emailTerkirim, wa, berlaku_hari: 3 };
+      await catatAudit(actor, {
+        action: "user.disetujui",
+        entityTable: "users",
+        entityId: target.id,
+        detail: { email: target.email, aktivasi: { email_terkirim: emailTerkirim, wa } },
+      });
+    } catch (error) {
+      console.error("[PERSETUJUAN] aktivasi otomatis gagal:", error);
+    }
+  }
+
+  return NextResponse.json({ ok: true, user: updated[0], ...(aktivasi ? { aktivasi } : {}) });
 }
