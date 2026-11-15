@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { TombolGoogle } from "@/components/tombol-google";
 
 const inputStyle: React.CSSProperties = {
   padding: "10px 12px",
@@ -80,6 +81,11 @@ export default function RegisterPage() {
             Pilih peran sesuai posisi kamu. Peran Super Admin hanya bisa diberikan admin.
           </span>
         </div>
+
+        <TombolGoogle label="Daftar dengan Google" />
+        <p style={{ fontSize: 12.5, color: "var(--muted)", textAlign: "center", margin: 0 }}>
+          atau daftar dengan formulir. Akun Google juga menunggu persetujuan Super Admin sebelum bisa masuk.
+        </p>
 
         {pendingMsg ? (
           <p style={{ marginTop: 14, padding: "10px 12px", borderRadius: 10, background: "#EAF7EE", color: "#1B6B33", fontSize: 13 }}>

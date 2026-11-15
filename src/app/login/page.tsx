@@ -1,14 +1,33 @@
 "use client";
 
 import { MerekAplikasi } from "@/components/merek-sekolah";
+import { TombolGoogle } from "@/components/tombol-google";
 
 import { useState } from "react";
 import Link from "next/link";
 
 // Login sungguhan: kredensial diperiksa ke tabel users (scrypt) dan sesi
 // disimpan sebagai cookie bertanda tangan. Tampilan mengikuti versi Muse.
+const PESAN_GOOGLE: Record<string, string> = {
+  menunggu:
+    "Akun Google Anda diterima. Pendaftaran masih menunggu persetujuan Super Admin, Anda bisa masuk sesudah disetujui.",
+  "google-belum": "Masuk dengan Google belum diaktifkan. Hubungi admin sekolah.",
+  "google-gagal": "Masuk dengan Google gagal. Coba lagi, atau masuk dengan email dan kata sandi.",
+  "google-email": "Email akun Google Anda belum terverifikasi, jadi belum bisa dipakai masuk.",
+  "akun-nonaktif": "Akun Anda dinonaktifkan. Hubungi admin sekolah.",
+};
+
 export default function LoginPage() {
-  const [stage, setStage] = useState<"credentials" | "totp">("credentials");
+  const [stage, setStage] = useState<"credentials" | "totp">(
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("dua") === "1"
+      ? "totp"
+      : "credentials"
+  );
+  const [pesanGoogle] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const kode = new URLSearchParams(window.location.search).get("pesan");
+    return kode ? PESAN_GOOGLE[kode] || null : null;
+  });
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -121,11 +140,15 @@ export default function LoginPage() {
               />
             </div>
 
+            {pesanGoogle ? <p className="notice" role="status" style={{ marginTop: 12 }}>{pesanGoogle}</p> : null}
             {error ? <p className="notice" role="alert" style={{ marginTop: 12 }}>{error}</p> : null}
 
             <button className="btn" type="submit" disabled={busy} style={{ width: "100%", marginTop: 18 }}>
               {busy ? "Memeriksa…" : "Masuk"}
             </button>
+
+            <p className="muted" style={{ textAlign: "center", marginTop: 14, fontSize: 12.5 }}>atau</p>
+            <TombolGoogle label="Masuk dengan Google" />
 
             <p className="notice" role="note" style={{ marginTop: 14 }}>
               <Link href="/forgot">Lupa kata sandi?</Link>

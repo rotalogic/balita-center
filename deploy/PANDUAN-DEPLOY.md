@@ -61,11 +61,17 @@ psql "$DATABASE_URL" -f database/migrasi-zkc-tahap2-deteksi.sql
 psql "$DATABASE_URL" -f database/migrasi-absensi-guru.sql
 psql "$DATABASE_URL" -f database/migrasi-wa-openwa.sql
 psql "$DATABASE_URL" -f database/migrasi-penyempurnaan-demo.sql
+psql "$DATABASE_URL" -f database/migrasi-auth-google.sql
 ```
 
 Migrasi terakhir (15 November 2026, penyempurnaan mengikuti Tur Demo)
 menambah penanda laporan terbaca orang tua dan tabel paket sesi anak;
-aman dijalankan berulang.
+aman dijalankan berulang. Migrasi sesudahnya (migrasi-auth-google.sql)
+menambah kolom google_sub untuk fitur Masuk/Daftar dengan Google; juga
+aman dijalankan berulang. Fitur Google aktif hanya bila GOOGLE_CLIENT_ID
+dan GOOGLE_CLIENT_SECRET terisi di berkas env server, dengan URI alihan
+terdaftar persis ${APP_BASE_URL}/api/auth/google/callback di Google
+Cloud Console.
 
 Sesudah migrasi, muat berkas impor resmi lembaga (salinannya tersimpan di
 `database/impor/`; STPPA 210 butir dapat juga lewat tombol Impor CSV di

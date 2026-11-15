@@ -4,6 +4,7 @@ import { guard } from "@/lib/current-user";
 import { catatAudit } from "@/lib/audit";
 import { getIdentitas } from "@/lib/sekolah";
 import { smtpConfigured } from "@/lib/mail";
+import { googleConfigured } from "@/lib/google";
 import { storageMode } from "@/lib/storage";
 import { segarkanGateway } from "@/lib/gateway";
 import { llmSumber } from "@/lib/ailsa/llm";
@@ -37,6 +38,7 @@ export async function GET() {
       { kunci: "gateway", label: "Payment Gateway (Midtrans)", ok: Boolean(gw.aktif && gw.server_key && gw.client_key), keterangan: gw.aktif ? (gw.sandbox ? "Aktif — mode Sandbox" : "Aktif — mode Produksi") : gw.server_key ? "Kunci tersimpan, belum diaktifkan (halaman Keuangan)" : "Belum diatur — atur di halaman Keuangan" },
       { kunci: "storage", label: "Penyimpanan Foto/Video", ok: true, keterangan: storageMode() === "s3" ? "Object storage (S3/R2)" : "Disk lokal server" },
       { kunci: "whatsapp", label: "Kanal WhatsApp Ailsa", ok: false, keterangan: "Nonaktif atas keputusan pemilik — pemberitahuan berjalan lewat email" },
+      { kunci: "google", label: "Masuk dengan Google", ok: googleConfigured(), keterangan: googleConfigured() ? "Terisi — tombol Google aktif di halaman Masuk dan Daftar" : "Belum diisi di env server (GOOGLE_CLIENT_ID dan GOOGLE_CLIENT_SECRET) — tombol Google tampil nonaktif" },
     ],
   });
 }
