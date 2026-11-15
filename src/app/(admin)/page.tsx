@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { EmptyState, ErrorState, LoadingState, PageHead, StatusBadge, useMe } from "@/components/chrome";
+import { DasborPendiri } from "@/components/dasbor-pendiri";
 
 type Stats = { children: number; staff: number; branches: number; revenueMonth: number; pendingReports: number; invoicesOpen: number };
 type Dash = {
@@ -64,6 +65,8 @@ export default function DashboardPage() {
             <article className="card kpi-card"><div className="kpi-icon tone-sage" aria-hidden="true">▦</div><div className="kpi-label">Pendapatan Bulan Ini (Buku Kas)</div><div className="kpi-value">{rupiah(stats.revenueMonth)}</div></article>
             <article className="card kpi-card"><div className="kpi-icon tone-peach" aria-hidden="true">⌂</div><div className="kpi-label">Cabang Aktif</div><div className="kpi-value">{stats.branches}</div></article>
           </section>
+
+          <DasborPendiri />
 
           <section className="grid two">
             <article className="card">

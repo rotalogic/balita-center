@@ -119,6 +119,24 @@ export async function GET(request: Request) {
         )
       : [];
 
+    // Penanda terbaca Satu Meja Laporan: laporan terbit yang dibuka orang
+    // tua sungguhan (bukan pratinjau staf) dicatat waktu bacanya sekali,
+    // pada pembukaan pertama. Staf yang membuka Connect tidak mengubahnya.
+    const laporanTerbaru = report[0] as Record<string, unknown> | undefined;
+    if (laporanTerbaru && !globalViewer && !laporanTerbaru.dibaca_ortu_at) {
+      const namaWali = wali[0]?.full_name || user.full_name || null;
+      const diperbarui = await query<{ dibaca_ortu_at: string }>(
+        `UPDATE daily_reports SET dibaca_ortu_at = now(), dibaca_ortu_nama = $2
+          WHERE id = $1 AND dibaca_ortu_at IS NULL
+          RETURNING dibaca_ortu_at`,
+        [String(laporanTerbaru.id), namaWali]
+      );
+      if (diperbarui[0]) {
+        laporanTerbaru.dibaca_ortu_at = diperbarui[0].dibaca_ortu_at;
+        laporanTerbaru.dibaca_ortu_nama = namaWali;
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       preview,

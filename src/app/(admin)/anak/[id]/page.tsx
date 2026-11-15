@@ -10,6 +10,9 @@ import { kataSkor } from "@/lib/skala";
 import { LencanaKategori, LencanaLabel } from "@/components/lencana-anak";
 import KartuKesepakatan from "@/components/kartu-kesepakatan";
 import KartuRujukan from "@/components/kartu-rujukan";
+import { PanelIndikasi } from "@/components/panel-indikasi";
+import { LaporanBulanan } from "@/components/laporan-bulanan";
+import { PaketSesi } from "@/components/paket-sesi";
 
 type Row = Record<string, string | number | null>;
 type Payload = {
@@ -431,6 +434,8 @@ export default function DetailAnakPage() {
         </section>
 
 
+        <PanelIndikasi childId={String(child.id)} />
+
         <article className="card" style={{ marginTop: 16 }}>
           <h2>Meja Laporan Terpadu</h2>
           <p className="muted" style={{ marginTop: 0 }}>
@@ -450,6 +455,13 @@ export default function DetailAnakPage() {
                       <div>
                         <strong>{r.status.replace(/_/g, " ")}</strong>
                         <div><a href={`/daily-reports/${r.id}`}>Buka laporan</a></div>
+                        {r.status === "published" ? (
+                          <div className="muted">
+                            {(r as Record<string, unknown>).dibaca_ortu_at
+                              ? `Terbaca orang tua ${new Date(String((r as Record<string, unknown>).dibaca_ortu_at)).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
+                              : "Belum dibaca orang tua"}
+                          </div>
+                        ) : null}
                       </div>
                     </li>
                   ))}
@@ -494,7 +506,10 @@ export default function DetailAnakPage() {
               )}
             </div>
           </div>
+          <LaporanBulanan childId={String(child.id)} />
         </article>
+
+        <PaketSesi childId={String(child.id)} />
         <article className="card" style={{ marginTop: 16 }}>
           <h2>Catat Perkembangan Berkala</h2>
           <p className="muted">Nilai capaian per aspek dalam persen (0–100). Isi aspek yang dinilai saja; kosongkan yang belum dinilai pada periode ini.</p>

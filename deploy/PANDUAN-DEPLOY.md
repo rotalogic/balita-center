@@ -60,7 +60,12 @@ psql "$DATABASE_URL" -f database/migrasi-zkc-tahap2-dokumentasi.sql
 psql "$DATABASE_URL" -f database/migrasi-zkc-tahap2-deteksi.sql
 psql "$DATABASE_URL" -f database/migrasi-absensi-guru.sql
 psql "$DATABASE_URL" -f database/migrasi-wa-openwa.sql
+psql "$DATABASE_URL" -f database/migrasi-penyempurnaan-demo.sql
 ```
+
+Migrasi terakhir (15 November 2026, penyempurnaan mengikuti Tur Demo)
+menambah penanda laporan terbaca orang tua dan tabel paket sesi anak;
+aman dijalankan berulang.
 
 Sesudah migrasi, muat berkas impor resmi lembaga (salinannya tersimpan di
 `database/impor/`; STPPA 210 butir dapat juga lewat tombol Impor CSV di

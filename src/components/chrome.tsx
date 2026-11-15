@@ -31,6 +31,7 @@ export function useMe(): Me | null {
 // [href, label, ikon, izin yang dibutuhkan]
 const ADMIN_MENU: Array<[string, string, string, string]> = [
   ["/", "Dashboard", "⌂", "dashboard.view"],
+  ["/portal-guru", "Portal Guru", "✿", "dashboard.view"],
   ["/akademik", "Akademik", "▤", "students.view"],
   ["/bahan-ajar", "Bahan Ajar", "✐", "students.view"],
   ["/anak", "Anak Didik", "☺", "students.view"],

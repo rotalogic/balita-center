@@ -25,7 +25,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
           WHERE e.child_id = $1 ORDER BY e.start_date DESC LIMIT 1`,
         [params.id]
       ),
-      query("SELECT id, report_date, status, mood FROM daily_reports WHERE child_id = $1 AND deleted_at IS NULL ORDER BY report_date DESC LIMIT 24", [params.id]),
+      query("SELECT id, report_date, status, mood, published_at, dibaca_ortu_at, dibaca_ortu_nama FROM daily_reports WHERE child_id = $1 AND deleted_at IS NULL ORDER BY report_date DESC LIMIT 24", [params.id]),
       query("SELECT * FROM health_checks WHERE child_id = $1 ORDER BY checked_on DESC LIMIT 5", [params.id]),
       query("SELECT * FROM child_development_records WHERE child_id = $1 ORDER BY recorded_on DESC LIMIT 3", [params.id]),
       query("SELECT * FROM student_milestones WHERE child_id = $1 ORDER BY achieved_on DESC LIMIT 10", [params.id]),
