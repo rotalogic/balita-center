@@ -192,8 +192,12 @@ export async function giliranAilsa(
   }
 
   const hasil = await panggilLLM([
-    { role: "system", content: SYSTEM_PROMPT_AILSA },
-    { role: "system", content: konteks },
+    // Satu pesan system gabungan (prompt + konteks). Endpoint kompatibel
+    // OpenAI milik Gemini hanya menghormati satu pesan system: dua pesan
+    // system membuat skema JSON di prompt hilang dan jawaban model keluar
+    // format (terbukti di evaluasi Fase 2, 27 Nov 2026). DeepSeek dan
+    // provider lain tetap kompatibel dengan bentuk gabungan ini.
+    { role: "system", content: `${SYSTEM_PROMPT_AILSA}\n\n${konteks}` },
     { role: "user", content: pesanMasuk },
   ]);
 
