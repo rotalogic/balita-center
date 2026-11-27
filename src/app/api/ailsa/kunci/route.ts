@@ -43,15 +43,26 @@ type Body = {
 // huruf/angka/titik/strip/garis bawah/garis miring/titik dua, maks 64 karakter.
 const POLA_MODEL = /^[A-Za-z0-9][A-Za-z0-9._\-/:]{0,63}$/;
 
+// Header otentikasi per provider: semua menerima Bearer; Anthropic juga
+// mengharapkan x-api-key + anthropic-version pada lapisan kompatibelnya.
+function headerKunci(base: string, key: string): Record<string, string> {
+  return {
+    Authorization: `Bearer ${key}`,
+    ...(base.includes("anthropic.com")
+      ? { "x-api-key": key, "anthropic-version": "2023-06-01" }
+      : {}),
+  };
+}
+
 async function ujiKoneksi(base: string, key: string): Promise<{ ok: boolean; pesan: string }> {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 15000);
+  const timer = setTimeout(() => ctrl.abort(), 30000);
   try {
     const res = await fetch(`${base.replace(/\/$/, "")}/models`, {
-      headers: { Authorization: `Bearer ${key}` },
+      headers: headerKunci(base, key),
       signal: ctrl.signal,
     });
-    if (res.ok) return { ok: true, pesan: "Koneksi DeepSeek berhasil — kunci diterima." };
+    if (res.ok) return { ok: true, pesan: "Koneksi LLM berhasil — kunci diterima." };
     let detail = `HTTP ${res.status}`;
     try {
       const j = (await res.json()) as { error?: { message?: string } };
@@ -59,10 +70,10 @@ async function ujiKoneksi(base: string, key: string): Promise<{ ok: boolean; pes
     } catch {
       /* biarkan status saja */
     }
-    return { ok: false, pesan: `DeepSeek menolak: ${detail}` };
+    return { ok: false, pesan: `Server LLM menolak: ${detail}` };
   } catch (error) {
     const putus = (error as Error)?.name === "AbortError";
-    return { ok: false, pesan: putus ? "Koneksi ke DeepSeek kehabisan waktu (15 detik)." : "Tidak dapat menghubungi DeepSeek dari server ini." };
+    return { ok: false, pesan: putus ? "Koneksi ke server LLM kehabisan waktu (30 detik)." : "Tidak dapat menghubungi server LLM dari server ini." };
   } finally {
     clearTimeout(timer);
   }
@@ -98,10 +109,10 @@ export async function POST(request: Request) {
     if (aksi === "model_list") {
       if (!kunciAktif) return NextResponse.json({ ok: false, error: "Belum ada kunci. Isi kunci dulu, lalu muat daftar model." }, { status: 400 });
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 15000);
+      const timer = setTimeout(() => ctrl.abort(), 30000);
       try {
         const res = await fetch(`${baseAktif.replace(/\/$/, "")}/models`, {
-          headers: { Authorization: `Bearer ${kunciAktif}` },
+          headers: headerKunci(baseAktif, kunciAktif),
           signal: ctrl.signal,
         });
         if (!res.ok) {
@@ -120,7 +131,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true, models, pesan: `${models.length} model ditemukan di server.` });
       } catch (error) {
         const putus = (error as Error)?.name === "AbortError";
-        return NextResponse.json({ ok: false, error: putus ? "Koneksi kehabisan waktu (15 detik)." : "Tidak dapat menghubungi server LLM." }, { status: 400 });
+        return NextResponse.json({ ok: false, error: putus ? "Koneksi kehabisan waktu (30 detik)." : "Tidak dapat menghubungi server LLM." }, { status: 400 });
       } finally {
         clearTimeout(timer);
       }
@@ -128,7 +139,7 @@ export async function POST(request: Request) {
 
     // aksi === "simpan"
     if (!kunciBaru && !rows[0]?.llm_api_key) {
-      return NextResponse.json({ ok: false, error: "Kunci API DeepSeek wajib diisi." }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "Kunci API wajib diisi." }, { status: 400 });
     }
     if (kunciBaru && kunciBaru.length < 10) {
       return NextResponse.json({ ok: false, error: "Kunci terlalu pendek — periksa kembali salinannya." }, { status: 400 });
@@ -155,7 +166,7 @@ export async function POST(request: Request) {
       detail: { model: (body.model || "deepseek-chat").trim(), base_url: baseAktif },
     });
     await segarkanKonfigurasi(true);
-    return NextResponse.json({ ok: true, pesan: "Kunci DeepSeek tersimpan dan langsung aktif.", masker: llmMasker(), configured: llmConfigured() });
+    return NextResponse.json({ ok: true, pesan: "Kunci LLM tersimpan dan langsung aktif.", masker: llmMasker(), configured: llmConfigured() });
   } catch (error) {
     return NextResponse.json({ ok: false, error: dbErrorMessage(error) }, { status: 503 });
   }

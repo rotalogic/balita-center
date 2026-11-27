@@ -32,6 +32,22 @@ type DataWa = {
   antrean: { antre: number; terkirim: number; gagal: number; hitungan_batch: number; jeda_sampai: string | null; terakhir_kirim_at: string | null };
 };
 
+// Pilihan provider LLM Ailsa (semua kompatibel OpenAI chat/completions).
+// Memilih provider mengisi Base URL + model bawaan; keduanya tetap bisa
+// diubah manual. Provider "kustom" untuk gateway kompatibel OpenAI lain.
+const PROVIDER_LLM = [
+  { id: "deepseek", label: "DeepSeek", base_url: "https://api.deepseek.com/v1", model: "deepseek-chat", contohKunci: "sk-…", sumber: "platform.deepseek.com" },
+  { id: "gemini", label: "Google Gemini", base_url: "https://generativelanguage.googleapis.com/v1beta/openai", model: "gemini-2.5-flash", contohKunci: "AIza…", sumber: "aistudio.google.com/apikey" },
+  { id: "claude", label: "Anthropic Claude", base_url: "https://api.anthropic.com/v1", model: "claude-sonnet-4-5", contohKunci: "sk-ant-…", sumber: "console.anthropic.com" },
+  { id: "openai", label: "OpenAI", base_url: "https://api.openai.com/v1", model: "gpt-4o-mini", contohKunci: "sk-…", sumber: "platform.openai.com" },
+  { id: "kustom", label: "Kustom (kompatibel OpenAI)", base_url: "", model: "", contohKunci: "…", sumber: "gateway pilihan admin" },
+] as const;
+
+function deteksiProvider(baseUrl: string): string {
+  const cocok = PROVIDER_LLM.find((p) => p.base_url && p.base_url === baseUrl.replace(/\/$/, ""));
+  return cocok ? cocok.id : "kustom";
+}
+
 // Kartu Gateway WhatsApp OpenWA: provider pesan keluar Ailsa dapat dipilih
 // antara Meta Cloud API (resmi) dan OpenWA (gateway mandiri). Pesan lewat
 // OpenWA selalu masuk antrean beritme: teks divariasikan per pesan, jeda
@@ -274,6 +290,16 @@ export function AilsaClient({ bagian }: { bagian?: string }) {
 
   const [kunci, setKunci] = useState<{ tersimpan: boolean; masker: string | null; model: string; base_url: string } | null>(null);
   const [kunciForm, setKunciForm] = useState({ api_key: "", model: "deepseek-chat", base_url: "https://api.deepseek.com/v1" });
+  const [providerLlm, setProviderLlm] = useState<string>("deepseek");
+
+  function pilihProvider(id: string) {
+    setProviderLlm(id);
+    const p = PROVIDER_LLM.find((x) => x.id === id);
+    if (p && id !== "kustom") {
+      setKunciForm((f) => ({ ...f, base_url: p.base_url, model: p.model }));
+      setDaftarModel([]);
+    }
+  }
   const [daftarModel, setDaftarModel] = useState<string[]>(["deepseek-chat", "deepseek-reasoner"]);
 
   async function muatModel() {
@@ -332,6 +358,7 @@ export function AilsaClient({ bagian }: { bagian?: string }) {
         if (!d.ok) return;
         setKunci(d);
         setKunciForm((f) => ({ ...f, model: d.model || f.model, base_url: d.base_url || f.base_url }));
+        if (d.base_url) setProviderLlm(deteksiProvider(d.base_url));
       })
       .catch(() => null);
   }, []);
@@ -482,7 +509,7 @@ export function AilsaClient({ bagian }: { bagian?: string }) {
     <>
       <PageHead
         title="Ailsa"
-        subtitle="Asisten AI Balita Center dengan otak DeepSeek: menjawab hanya dari bank pengetahuan yang disetujui, mengumpulkan lead ke pipeline Admission."
+        subtitle="Asisten AI Balita Center dengan otak LLM pilihan admin: menjawab hanya dari bank pengetahuan yang disetujui, mengumpulkan lead ke pipeline Admission."
       />
       {error ? <ErrorState message={error} /> : null}
       {info ? (
@@ -513,7 +540,7 @@ export function AilsaClient({ bagian }: { bagian?: string }) {
               <th>Otak LLM</th>
               <td>
                 <StatusBadge status={status?.llm.configured ? "aktif" : "nonaktif"} />{" "}
-                {status?.llm.configured ? `Model: ${status.llm.model}` : "Belum ada kunci — isi kunci DeepSeek di kartu Kunci LLM di bawah."}
+                {status?.llm.configured ? `Model: ${status.llm.model}` : "Belum ada kunci — isi kunci LLM di kartu Kunci LLM di bawah."}
                 {status?.llm.dariAplikasi ? (
                   <span className="muted"> · kunci dari aplikasi ({status.llm.masker || "••••"})</span>
                 ) : status?.llm.kunci ? (
@@ -534,8 +561,8 @@ export function AilsaClient({ bagian }: { bagian?: string }) {
         </table>
         <p className={siap ? "muted" : "notice"} style={{ marginBottom: 0 }}>
           {siap
-            ? "Otak DeepSeek aktif — Ailsa bisa diajak bicara di Simulator dan dipakai membuat draf laporan serta analisa perkembangan (internal staf)."
-            : "Otak Ailsa belum menyala. Isi kunci DeepSeek di kartu Kunci LLM di bawah — tanpa Meta, tanpa mengubah file server."}
+            ? "Otak LLM aktif — Ailsa bisa diajak bicara di Simulator dan dipakai membuat draf laporan serta analisa perkembangan (internal staf)."
+            : "Otak Ailsa belum menyala. Isi kunci LLM di kartu Kunci LLM di bawah — tanpa mengubah file server."}
         </p>
       </article>
 
@@ -550,19 +577,20 @@ export function AilsaClient({ bagian }: { bagian?: string }) {
           <li><strong>Analisis bersifat internal.</strong> Analisa dan draf yang dibuat Ailsa hanya untuk staf. Orang tua menerima laporan resmi dari guru — tidak pernah menerima analisis Ailsa dalam bentuk apa pun (keputusan pemilik, 4 November 2026).</li>
           <li><strong>Bukan diagnosis.</strong> Ailsa tidak mendiagnosis, tidak memberi label klinis, dan tidak menjanjikan hasil. Dugaan kebutuhan khusus diarahkan ke alur Skrining dan Berkas Rujukan resmi lembaga.</li>
           <li><strong>Kanal WhatsApp nonaktif.</strong> Atas keputusan pemilik, Ailsa tidak melayani percakapan WhatsApp orang tua. Kanal yang berjalan hanya Simulator internal staf (Tahap 0) dan bantuan draf di dalam aplikasi.</li>
-          <li><strong>Kunci di tangan admin.</strong> Kunci model (DeepSeek) diisi admin dari aplikasi ini — tidak lewat percakapan, tidak dicatat di berkas lain.</li>
+          <li><strong>Kunci di tangan admin.</strong> Kunci model (provider pilihan admin: DeepSeek / Gemini / Claude / OpenAI / kustom) diisi admin dari aplikasi ini — tidak lewat percakapan, tidak dicatat di berkas lain.</li>
           <li><strong>Dapat diaudit.</strong> Proses dan jawaban Ailsa tercatat di panel Simulator dan Jejak Audit; jawaban yang keliru diperbaiki lewat Bank Pengetahuan, bukan dengan mengubah aturan ini.</li>
         </ul>
       </article>
 
       <KartuOpenWa />
       <article className="card" style={{ marginTop: 12 }}>
-        <h2 style={{ marginTop: 0 }}>Kunci LLM — DeepSeek</h2>
+        <h2 style={{ marginTop: 0 }}>Kunci LLM — Pilih Provider AI</h2>
         <p className="muted" style={{ marginTop: 0 }}>
-          Otak Ailsa memakai DeepSeek, <strong>bukan Meta</strong>. Tempel kunci API DeepSeek
-          (dari platform.deepseek.com) di sini — langsung aktif tanpa restart dan tanpa mengubah
-          file server. Kunci tersimpan di database sekolah dan tidak pernah ditampilkan lagi
-          selain 4 karakter terakhirnya.
+          Otak Ailsa bisa memakai provider AI apa pun yang kompatibel OpenAI: DeepSeek,
+          Google Gemini, Anthropic Claude, OpenAI, atau gateway kustom. Pilih providernya,
+          lalu tempel kunci API dari penyedia itu — langsung aktif tanpa restart dan tanpa
+          mengubah file server. Kunci tersimpan di database sekolah dan tidak pernah
+          ditampilkan lagi selain 4 karakter terakhirnya.
         </p>
         <p>
           Status:{" "}
@@ -572,8 +600,13 @@ export function AilsaClient({ bagian }: { bagian?: string }) {
             : "Belum ada kunci dari aplikasi. Ailsa memakai kunci env server bila ada."}
         </p>
         <div className="form-grid">
-          <div className="field"><label htmlFor="kc-key">Kunci API DeepSeek</label>
-            <input id="kc-key" type="password" autoComplete="off" placeholder={kunci?.tersimpan ? "Biarkan kosong untuk mempertahankan kunci lama" : "sk-…"}
+          <div className="field"><label htmlFor="kc-provider">Provider AI</label>
+            <select id="kc-provider" value={providerLlm} onChange={(e) => pilihProvider(e.target.value)}>
+              {PROVIDER_LLM.map((p) => (<option key={p.id} value={p.id}>{p.label}</option>))}
+            </select>
+            <small className="muted">Kunci diambil dari {PROVIDER_LLM.find((p) => p.id === providerLlm)?.sumber}. Memilih provider mengisi Base URL &amp; model bawaan — tetap bisa diubah manual di bawah.</small></div>
+          <div className="field"><label htmlFor="kc-key">Kunci API {PROVIDER_LLM.find((p) => p.id === providerLlm)?.label}</label>
+            <input id="kc-key" type="password" autoComplete="off" placeholder={kunci?.tersimpan ? "Biarkan kosong untuk mempertahankan kunci lama" : (PROVIDER_LLM.find((p) => p.id === providerLlm)?.contohKunci || "…")}
               value={kunciForm.api_key} onChange={(e) => setKunciForm({ ...kunciForm, api_key: e.target.value })} /></div>
           <div className="field"><label htmlFor="kc-model">Model</label>
             <input id="kc-model" list="kc-daftar-model" placeholder="deepseek-chat" value={kunciForm.model} onChange={(e) => setKunciForm({ ...kunciForm, model: e.target.value })} />
@@ -582,7 +615,7 @@ export function AilsaClient({ bagian }: { bagian?: string }) {
             </datalist>
             <small className="muted">Pilih dari daftar atau ketik nama model apa pun. Tombol Muat Model Terbaru mengambil daftar persis dari server — selalu yang paling baru.</small></div>
           <div className="field"><label htmlFor="kc-base">Base URL</label>
-            <input id="kc-base" type="url" value={kunciForm.base_url} onChange={(e) => setKunciForm({ ...kunciForm, base_url: e.target.value })} /></div>
+            <input id="kc-base" type="url" value={kunciForm.base_url} onChange={(e) => { setKunciForm({ ...kunciForm, base_url: e.target.value }); setProviderLlm(deteksiProvider(e.target.value)); }} /></div>
         </div>
         <div className="row" style={{ marginTop: 10 }}>
           <button type="button" className="btn" disabled={busy?.startsWith("kunci")} onClick={() => void aksiKunci("simpan")}>

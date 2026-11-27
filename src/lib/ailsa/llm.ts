@@ -1,4 +1,6 @@
-// Klien LLM (kompatibel OpenAI chat/completions) — otaknya DeepSeek.
+// Klien LLM (kompatibel OpenAI chat/completions) — provider bisa dipilih
+// admin dari kartu Kunci LLM: DeepSeek, Google Gemini, Anthropic Claude,
+// OpenAI, atau gateway kustom. DeepSeek tetap bawaan bila belum dipilih.
 // Urutan pemakaian:
 // 1) Kunci yang diisi admin dari halaman Ailsa (bot_settings.llm_api_key) —
 //    keputusan pemilik 8 Nov 2026: tanpa Meta, token DeepSeek diisi sendiri.
@@ -103,7 +105,16 @@ async function panggilSatu(opts: {
   try {
     const res = await fetch(`${opts.base}/chat/completions`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${opts.key}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${opts.key}`,
+        "Content-Type": "application/json",
+        // Anthropic (lapisan kompatibel OpenAI) mengharapkan kunci juga di
+        // x-api-key plus header versi; provider lain mengabaikan header ini
+        // hanya bila dikirim — jadi kirim khusus untuk anthropic.com saja.
+        ...(opts.base.includes("anthropic.com")
+          ? { "x-api-key": opts.key, "anthropic-version": "2023-06-01" }
+          : {}),
+      },
       body: JSON.stringify({
         model: opts.model,
         temperature: opts.suhu,

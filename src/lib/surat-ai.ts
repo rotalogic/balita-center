@@ -24,7 +24,7 @@ export async function susunIsiSurat(input: {
   if (!llmConfigured()) {
     return {
       ok: false,
-      error: "Kunci DeepSeek belum diisi. Isi dulu di Ailsa → Kanal & Kunci LLM (kartu Kunci LLM — DeepSeek), lalu coba lagi.",
+      error: "Kunci LLM belum diisi. Isi dulu di Ailsa → Kanal & Kunci LLM (kartu Kunci LLM), lalu coba lagi.",
     };
   }
   const konteks = [

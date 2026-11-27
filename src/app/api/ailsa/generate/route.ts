@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   }
   await segarkanKonfigurasi();
   if (!llmConfigured()) {
-    return NextResponse.json({ ok: false, error: "Otak LLM belum dikonfigurasi. Isi kunci DeepSeek di kartu Kunci LLM pada halaman Ailsa." }, { status: 503 });
+    return NextResponse.json({ ok: false, error: "Otak LLM belum dikonfigurasi. Isi kunci LLM di kartu Kunci LLM pada halaman Ailsa." }, { status: 503 });
   }
 
   try {
